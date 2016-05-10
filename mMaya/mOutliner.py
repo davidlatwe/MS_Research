@@ -6,12 +6,15 @@ Created on 2016.04.28
 '''
 import maya.cmds as cmds
 import maya.mel as mel
+import os
 import functools
 import logging
 
 logging.basicConfig(level=logging.WARNING)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
 
 def _useSelection(func):
 	"""

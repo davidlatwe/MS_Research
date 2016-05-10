@@ -6,6 +6,7 @@ Created on 2016.04.29
 '''
 import maya.cmds as cmds
 import maya.mel as mel
+import os
 import functools
 import logging
 
@@ -14,14 +15,11 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def workspaceRoot():
-	"""
-	"""
-	return cmds.workspace(q= 1, rd= 1)
-
 
 def sceneName(shn= None, ext= None):
 	"""
+	@param: shn 0/1
+			ext 0/1, 'ma', 'mb' 
 	"""
 	shn = True if shn is None or shn else False
 
@@ -35,35 +33,47 @@ def sceneName(shn= None, ext= None):
 			sceneName = os.path.basename(sceneName)
 		
 		# ext
-		if ext == '':
+		if not ext:
 			# return without ext
 			sceneName = '.'.join(sceneName.split('.')[:-1])
-		if ext == 'ma' or (ext == 'cn' and sceneName.endswith('.mb')):
+		if ext == 'ma':
 			# return mayaAscii file name
 			sceneName = '.'.join(sceneName.split('.')[:-1]) + '.ma'
-		if ext == 'mb' or (ext == 'cn' and sceneName.endswith('.ma')):
+		if ext == 'mb':
 			# return mayaBinary file name
 			sceneName = '.'.join(sceneName.split('.')[:-1]) + '.mb'
 
 		return sceneName
 
 	else:
-		pass
+
+		return None
 
 
 def untitled():
 	"""
 	"""
 	if cmds.file(q= 1, exn = 1).endswith('untitled'):
+
 		return True
 	else:
+
 		return False
+
+
+def namespaceList(current= None):
+	"""
+	"""
+	if not current:
+		cmds.namespace(set = ':')
+
+	return cmds.namespaceInfo(lon= 1, r= 1, an= 1)
 
 
 def namespaceDel(name):
 	"""
 	"""
-	for ns in cmds.namespaceInfo(lon= 1, r= 1, an= 1):
+	for ns in namespaceList():
 		if name in ns:
 			cmds.namespace(rm = ns, dnc = 1)
 
@@ -74,6 +84,7 @@ def namespaceSet(name):
 	if not cmds.namespace(ex = name):
 		cmds.namespace(add = name)
 	cmds.namespace(set = name)
+
 
 
 if __name__ == '__main__':
