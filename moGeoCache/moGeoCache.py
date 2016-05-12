@@ -6,75 +6,15 @@ Created on 2016.04.28
 '''
 import maya.cmds as cmds
 import maya.mel as mel
-import mMaya.mOutliner as mOutliner
-import mMaya.mGeneral as mGeneral
-import mo_ioRules as ioRules
+#import mMaya.mOutliner as mOutliner
+#import mMaya.mGeneral as mGeneral
+import moGeoCacheRules as moRules
+import moGeoCacheMethod as moMethod
 import xml.dom.minidom as minidom
 
 
-def _exportList():
-	"""
-	傳回物件清單，可建立不同入列規則來產生不同範圍的物件清單
-	"""
-	expListTmp = []
 
-	''' list out objs '''
-	# get selection's root transform node
-	expListTmp = mOutliner.findRoot('transform')
-	# direct using selection
-	#expListTmp = cmds.ls(sl= 1)
-	# non-gui mode
-
-	''' check if obj in a namespace '''
-	expList = expListTmp
-	for obj in expListTmp:
-		if len(obj.split(':')) > 2:
-			if not obj.split(':')[1]:
-				expList.remove(obj)
-
-	return expList
-
-
-def _filterOut(rootNode):
-	"""
-	過濾不必要的物件
-	"""
-	# meshes need to process
-	anim_meshes = []
-	# meshes have visible animation
-	anim_viskey = []
-
-	def _set(mylist):
-		# 先檢查 list 是否為空的，再轉 set
-		return set(mylist) if mylist else None
-
-	''' # FILTER OUT # <intermediate objects> '''
-	# intermediate objects
-	itrm_meshes = _set(mOutliner.findIMObj(rootNode))
-	# meshes without intermediate objects
-	anim_meshes = _set(cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'mesh')) - itrm_meshes
-
-	''' # FILTER OUT # <constant hidden objects> '''
-	for obj in mOutliner.findHidden(rootNode):
-		# check if visibility has being connected to something like animCurve or expression
-		if not cmds.listConnections(obj + '.visibility'):
-			# no connection, check if transform obj has mesh child
-			if cmds.objectType(obj) == 'transform':
-				hiddenChild = _set(cmds.listRelatives(obj, ad= 1, f= 1))
-				if hiddenChild:
-					# remove hidden meshes
-					anim_meshes = anim_meshes - hiddenChild
-			if cmds.objectType(obj) == 'mesh':
-				# remove hidden mesh
-				anim_meshes.remove(obj)
-		else:
-			# do something if has key or expression connected to visibility
-			anim_viskey.append(obj)
-
-	return anim_meshes, anim_viskey
-
-
-def _doExportViskey(assetName, exportDir):
+def doExportViskey(assetName, exportDir):
 	"""
 	輸出 visible key
 	"""
@@ -82,7 +22,7 @@ def _doExportViskey(assetName, exportDir):
 	cmds.file(exportDir + '/' + assetName, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
 
 
-def _doGeoCache(assetName, exportDir):
+def doGeoCache(assetName, exportDir):
 	"""
 	設定 geoCache 參數並執行
 	"""
@@ -150,14 +90,14 @@ def _chop(objName):
 		return ':'.join(objName.split(':')[1:])
 
 
-def mo_exportGeoCache():
+def exportGeoCache():
 	"""
 	輸出 geoCache
 	"""
 
 	''' vars '''
 	# get list of items to export
-	rootNode_List = _exportList()
+	rootNode_List = moMethod.exportList()
 	# namespace during action
 	mGC_nameSpace = ':mGeoCache'
 
@@ -168,16 +108,14 @@ def mo_exportGeoCache():
 	for rootNode in rootNode_List:
 		# anim_meshes : meshes need to process
 		# anim_viskey : meshes have visible animation
-		anim_meshes, anim_viskey = _filterOut(rootNode)
+		anim_meshes, anim_viskey = moMethod.filterOut(rootNode)
 		assetName = rootNode.split(':')[0].split('_')[0]
-		exportDir = ioRules.rule_moGeoCache(assetName)
+		exportDir = moRules.rule_moGeoCache(assetName)
 
 		''' Add and Set namespace '''
 		mGeneral.namespaceSet(mGC_nameSpace)
 
-		if anim_viskey:
-			pass
-			"""
+		if anim_viskey and False:
 			''' collect all visibility animation node '''
 			visAniNodeList = []
 			for visNode in anim_viskey:
@@ -186,8 +124,7 @@ def mo_exportGeoCache():
 				visAniNodeList.append(cmds.duplicate(node, n= visAniNode)[0])
 			''' export visKey '''
 			cmds.select(visAniNodeList, r= 1)
-			_doExportViskey(assetName, exportDir)
-			"""
+			doExportViskey(assetName, exportDir)
 
 		if anim_meshes:
 			''' polyUnite '''
@@ -211,20 +148,20 @@ def mo_exportGeoCache():
 				cmds.connectAttr(pUnite + '.output', vesShape + '.inMesh')
 			''' export GeoCache '''
 			cmds.select(ves_top, r= 1, hi= 1)
-			_doGeoCache(assetName, exportDir)
+			doGeoCache(assetName, exportDir)
 
 		''' remove mGC namespace '''
 		mGeneral.namespaceDel(mGC_nameSpace)
 
 
-def mo_importGeoCache(sceneName):
+def importGeoCache(sceneName):
 	"""
 	輸入 geoCache
 	"""
 
 	''' vars '''
 	# get list of items to export
-	rootNode_List = _exportList()
+	rootNode_List = moMethod.exportList()
 
 	''' start procedure '''
 	for rootNode in rootNode_List:
@@ -234,7 +171,7 @@ def mo_importGeoCache(sceneName):
 		anim_viskey = []
 		assetNamespace = rootNode.split(':')[0]
 		assetName = assetNamespace.split('_')[0]
-		importDir = ioRules.rule_moGeoCache(assetName, sceneName)
+		importDir = moRules.rule_moGeoCache(assetName, sceneName)
 
 		''' get mesh list from xml file '''
 		xmlFile = importDir + '/' + assetName + '.xml'
@@ -248,22 +185,21 @@ def mo_importGeoCache(sceneName):
 		cmds.select(anim_meshes, r= 1)
 		mel.eval('importCacheFile "' + xmlFile + '" "Best Guess";')
 
-		"""
 		''' import viskey '''
 		keyFile = importDir + '/' + assetName + '.ma'
-		viskeyNamespace = assetNamespace + ':geoViskey'
-		cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNamespace)
-		visAniNodeList = cmds.namespaceInfo(viskeyNamespace, lod= 1)
-		for visAniNode in visAniNodeList:
-			visAniMesh = assetNamespace + ':' + visAniNode.split('__viskey__')[1]
-			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
-		"""
+		if cmds.file(keyFile, q= 1, ex= 1) and False:
+			viskeyNamespace = assetNamespace + ':geoViskey'
+			cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNamespace)
+			visAniNodeList = cmds.namespaceInfo(viskeyNamespace, lod= 1)
+			for visAniNode in visAniNodeList:
+				visAniMesh = assetNamespace + ':' + visAniNode.split('__viskey__')[1]
+				cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
 
 
 
 if __name__ == '__main__':
 	reload(mOutliner)
 	reload(mGeneral)
-	reload(ioRules)
-	#mo_exportGeoCache()
-	mo_importGeoCache('SOK_c02_c03_anim_v04Vis')
+	reload(moRules)
+	#exportGeoCache()
+	#importGeoCache('SOK_c02_c03_anim_v04Vis')
