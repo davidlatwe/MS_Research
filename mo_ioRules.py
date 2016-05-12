@@ -7,9 +7,14 @@ Created on 2016.05.10
 import maya.cmds as cmds
 import maya.mel as mel
 import os
-#import sys
-#sys.path.insert(0, 'C:/Users/David/Documents/GitHub/MS_MayaOil')
-#import mMaya.mGeneral as mgnr
+import mo_SceneInfo
+
+
+
+def _getSceneInfo():
+	"""
+	"""
+	return mo_SceneInfo.SceneInfo()
 
 
 def pathSep():
@@ -21,16 +26,6 @@ def pathSep():
 	return sep
 
 
-def getDirRules():
-	"""
-	"""
-	ruleDict = {}
-	for rule in cmds.workspace(q= 1, frl= 1):
-		ruleDict[rule] = cmds.workspace(rule, q= 1, fre= 1)
-
-	return ruleDict
-
-
 def rule_scenePath():
 	"""
 	"""
@@ -38,12 +33,14 @@ def rule_scenePath():
 	return None
 
 
-def rule_moGeoCache(rootNode):
+def rule_moGeoCache(assetName, sceneName= None):
 	"""
 	"""
-	geoCache_root = getDirRules()['moGeoCache']
-	geoCache_name = rootNode.replace(':', '-')
-	geoCache_path = pathSep().join([ geoCache_root, _snx, geoCache_name ])
-	geoCache_file = geoCache_name + '@'
+	sInfo = _getSceneInfo()
 
-	return geoCache_path, geoCache_file
+	rootPath = sInfo.wksRoot + sInfo.dirRule['moGeoCache']
+	if sceneName is None:
+		sceneName = sInfo.scenSip
+	geoCache_path = pathSep().join([ rootPath, sceneName, assetName ])
+
+	return geoCache_path

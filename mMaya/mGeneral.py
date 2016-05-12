@@ -75,7 +75,7 @@ def namespaceDel(name):
 	"""
 	for ns in namespaceList():
 		if name in ns:
-			cmds.namespace(rm = ns, dnc = 1)
+			cmds.namespace(f= 1, rm = ns, dnc = 1)
 
 
 def namespaceSet(name):

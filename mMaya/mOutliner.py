@@ -43,7 +43,8 @@ def _useSelection(func):
 
 
 def findRoot(nodeType= None):
-	""" 找出所有已選取物件在 outliner 裡各自的根物件。
+	"""
+	找出所有已選取物件在 outliner 裡各自的根物件。
 	@param nodeType: [list, string] 根物件型別。要找多種型別可用 list ，只找單型別可用 string 。
 	"""
 	if nodeType is None:
@@ -62,7 +63,8 @@ def findRoot(nodeType= None):
 
 @_useSelection
 def findHidden(node= None):
-	""" 列出選取物件或指定物件底下隱藏的子物件。
+	"""
+	列出選取物件或指定物件底下隱藏的子物件。
 	@param node: [string] 物件名稱
 	"""
 	hiddenObj = []
@@ -75,7 +77,8 @@ def findHidden(node= None):
 
 
 def findType(nodeType, excludeType= None, node= None):
-	""" 列出選取物件或指定物件底下的特定型別子物件，或者列出選取物件或指定物件底下特定型別之外的子物件
+	"""
+	列出選取物件或指定物件底下的特定型別子物件，或者列出選取物件或指定物件底下特定型別之外的子物件
 	@param nodeType: [string] 物件型別
 	@param excludeType: [bool] include or exclude 預設為 False
 	@param node: [string] 物件名稱
