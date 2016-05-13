@@ -6,23 +6,21 @@ Created on 2016.04.28
 '''
 import maya.cmds as cmds
 import maya.mel as mel
-#import mMaya.mOutliner as mOutliner
-#import mMaya.mGeneral as mGeneral
-import moGeoCacheRules as moRules
-import moGeoCacheMethod as moMethod
-import xml.dom.minidom as minidom
+import moGeoCache.moGeoCacheRules as moRules
+import moGeoCache.moGeoCacheMethod as moMethod
 
 
 
-def doExportViskey(assetName, exportDir):
+def doExportViskey(geoCacheDir, assetName):
 	"""
 	輸出 visible key
 	"""
 	# do export
-	cmds.file(exportDir + '/' + assetName, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
+	keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName)
+	cmds.file(keyFile, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
 
 
-def doGeoCache(assetName, exportDir):
+def doGeoCache(geoCacheDir, assetName):
 	"""
 	設定 geoCache 參數並執行
 	"""
@@ -45,7 +43,7 @@ def doGeoCache(assetName, exportDir):
 		# 0/1, whether to refresh during caching
 		refresh = '0'
 		# directory for cache files, if "", then use project data dir
-		cacheDir = exportDir
+		cacheDir = geoCacheDir
 		# 0/1, whether to create a cache per geometry
 		perGeo = 0
 		# name of cache file. An empty string can be used to specify that an auto-generated name is acceptable.
@@ -79,127 +77,91 @@ def doGeoCache(assetName, exportDir):
 	args = [ _qts(_gcArgs()[var]) for var in _gcArgs.__code__.co_varnames ]
 	# make cmd and do GeoCache
 	evalCmd = 'doCreateGeometryCache ' + str(version) + ' {' + ', '.join(args) + '};'
-	print evalCmd
+	#print evalCmd
 	mel.eval(evalCmd)
-
-
-def _chop(objName):
-		"""
-		remove top namespace and keep the rest
-		"""
-		return ':'.join(objName.split(':')[1:])
 
 
 def exportGeoCache():
 	"""
 	輸出 geoCache
 	"""
-
-	''' vars '''
-	# get list of items to export
-	rootNode_List = moMethod.exportList()
+	# get list of items to process
+	rootNode_List = moMethod.mProcQueue()
 	# namespace during action
-	mGC_nameSpace = ':mGeoCache'
+	workingNS = moRules.rWorkingNamespace()
+	# remove mGC namespace
+	moMethod.mCleanWorkingNS(workingNS)
 
-	''' remove mGC namespace '''
-	mGeneral.namespaceDel(mGC_nameSpace)
-
-	''' start procedure '''
 	for rootNode in rootNode_List:
-		# anim_meshes : meshes need to process
-		# anim_viskey : meshes have visible animation
-		anim_meshes, anim_viskey = moMethod.filterOut(rootNode)
-		assetName = rootNode.split(':')[0].split('_')[0]
-		exportDir = moRules.rule_moGeoCache(assetName)
-
-		''' Add and Set namespace '''
-		mGeneral.namespaceSet(mGC_nameSpace)
+		# FILTER OUT <intermediate objects> & <constant hidden objects>
+		tmpResult = moMethod.mFilterOut(rootNode)
+		# loop vars
+		anim_meshes = tmpResult[0]
+		anim_viskey = tmpResult[1]
+		assetNamespace = moRules.rAssetNamespace(rootNode)
+		assetName = moRules.rAssetName(assetNamespace)
+		geoCacheDir = moRules.rGeoCacheDir(assetName)
+		
+		# Add and Set namespace
+		moMethod.mSetupWorkingNS(workingNS)
 
 		if anim_viskey and False:
-			''' collect all visibility animation node '''
-			visAniNodeList = []
-			for visNode in anim_viskey:
-				node = cmds.listConnections(visNode + '.visibility')[0]
-				visAniNode = '__viskey__' + _chop(visNode)
-				visAniNodeList.append(cmds.duplicate(node, n= visAniNode)[0])
-			''' export visKey '''
+			# collect all visibility animation node
+			visAniNodeList = moMethod.mDuplicateViskey(anim_viskey)
+			# export visKey
 			cmds.select(visAniNodeList, r= 1)
-			doExportViskey(assetName, exportDir)
+			doExportViskey(geoCacheDir, assetName)
 
 		if anim_meshes:
-			''' polyUnite '''
-			# create a group for geoCaching carrier
-			ves_top = cmds.group(em= 1, n= _chop(rootNode))
-			# convert meshes by polyUnite node into geoCaching carrier
-			for animShpae in anim_meshes:
-				# get transform node's name without namespace
-				animTrans = _chop(cmds.listRelatives(animShpae, p= 1)[0])
-				# create a polyCube as a carrier for geoCaching and match name 
-				vesTrans = cmds.polyCube(n= animTrans, ch= 0)[0]
-				# rename polyCube's shape node to match name
-				vesShape = cmds.rename(cmds.listRelatives(vesTrans, s= 1)[0], _chop(animShpae))
-				# put in to the geoCaching carrier's group
-				cmds.parent(vesTrans, ves_top)
-				# create polyUnite node
-				pUnite = cmds.createNode('polyUnite', n= 'polyUnite_' + animTrans)
-				# carrier load up
-				cmds.connectAttr(animShpae + '.worldMatrix', pUnite + '.inputMat[0]')
-				cmds.connectAttr(animShpae + '.worldMesh', pUnite + '.inputPoly[0]')
-				cmds.connectAttr(pUnite + '.output', vesShape + '.inMesh')
-			''' export GeoCache '''
-			cmds.select(ves_top, r= 1, hi= 1)
-			doGeoCache(assetName, exportDir)
+			# polyUnite
+			ves_grp = moMethod.mPolyUniteMesh(anim_meshes)
+			# smooth 1 level before export
+			moMethod.mSmoothMesh(ves_grp)
+			# write out transform node's name
+			transFile = moRules.rTransNameFilePath(geoCacheDir, assetName)
+			moMethod.mSaveTransformName(ves_grp, transFile)
+			# export GeoCache
+			cmds.select(ves_grp, r= 1, hi= 1)
+			doGeoCache(geoCacheDir, assetName)
 
-		''' remove mGC namespace '''
-		mGeneral.namespaceDel(mGC_nameSpace)
+		# remove mGC namespace
+		moMethod.mCleanWorkingNS(workingNS)
 
 
 def importGeoCache(sceneName):
 	"""
 	輸入 geoCache
 	"""
+	# get list of items to process
+	rootNode_List = moMethod.mProcQueue()
 
-	''' vars '''
-	# get list of items to export
-	rootNode_List = moMethod.exportList()
-
-	''' start procedure '''
 	for rootNode in rootNode_List:
-		# anim_meshes : meshes need to process
-		# anim_viskey : meshes have visible animation
-		anim_meshes = []
-		anim_viskey = []
-		assetNamespace = rootNode.split(':')[0]
-		assetName = assetNamespace.split('_')[0]
-		importDir = moRules.rule_moGeoCache(assetName, sceneName)
+		# loop vars
+		assetNamespace = moRules.rAssetNamespace(rootNode)
+		assetName = moRules.rAssetName(assetNamespace)
+		geoCacheDir = moRules.rGeoCacheDir(assetName, sceneName)
+		xmlFile = moRules.rXMLFilePath(geoCacheDir, assetName)
+		transFile = moRules.rTransNameFilePath(geoCacheDir, assetName)
 
-		''' get mesh list from xml file '''
-		xmlFile = importDir + '/' + assetName + '.xml'
-		Channels = minidom.parse(xmlFile).getElementsByTagName('Channels')[0]
-		for ChannelName in Channels.childNodes:
-			if ChannelName.nodeType == ChannelName.ELEMENT_NODE:
-				meshName = assetNamespace + ':' + _chop(ChannelName.getAttribute('ChannelName'))
-				anim_meshes.append(meshName)
-
-		''' import GeoCache '''
-		cmds.select(anim_meshes, r= 1)
-		mel.eval('importCacheFile "' + xmlFile + '" "Best Guess";')
-
-		''' import viskey '''
-		keyFile = importDir + '/' + assetName + '.ma'
+		if cmds.file(xmlFile, q= 1, ex= 1) and cmds.file(transFile, q= 1, ex= 1):
+			# get transform list from txt file
+			anim_trans = moMethod.mTXTTransList(transFile, rootNode)
+			# import GeoCache
+			cmds.select(anim_trans, r= 1)
+			mel.eval('source doImportCacheArgList')
+			mel.eval('if(catch(`deleteCacheFile 3 { "keep", "", "geometry" }`)){print "// moGeoCache: No caches.";}')
+			mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+		# get viskey from ma file
+		keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName)
 		if cmds.file(keyFile, q= 1, ex= 1) and False:
-			viskeyNamespace = assetNamespace + ':geoViskey'
-			cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNamespace)
-			visAniNodeList = cmds.namespaceInfo(viskeyNamespace, lod= 1)
-			for visAniNode in visAniNodeList:
-				visAniMesh = assetNamespace + ':' + visAniNode.split('__viskey__')[1]
-				cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
+			viskeyNamespace = moRules.rViskeyNamespace()
+			# import viskey
+			moMethod.mImportViskey(keyFile, assetNamespace, viskeyNamespace)
 
 
 
 if __name__ == '__main__':
-	reload(mOutliner)
-	reload(mGeneral)
 	reload(moRules)
-	#exportGeoCache()
-	#importGeoCache('SOK_c02_c03_anim_v04Vis')
+	reload(moMethod)
+	exportGeoCache()
+	#importGeoCache('SOK_c01_anim_v01')

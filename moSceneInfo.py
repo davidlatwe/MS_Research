@@ -15,13 +15,13 @@ class SceneInfo(object):
 	def __init__(self):
 
 		''' os '''
-		self.sep = _pathSep()
+		self.sep = self.pathSep()
 
 		''' maya basic '''
 		# project root
 		self.workspaceRoot = cmds.workspace(q= 1, rd= 1)
 		# project folder path dict
-		self.dirRule = self._getDirRules()
+		self.dirRule = self.getDirRules()
 		# scene full path
 		self.sceneFullPath = mGeneral.sceneName(shn= 0, ext= 1)
 		# scene name with ext
@@ -42,7 +42,7 @@ class SceneInfo(object):
 		self.cam = []
 
 
-	def _getDirRules(self):
+	def getDirRules(self):
 		"""
 		"""
 		ruleDict = {}
@@ -52,7 +52,7 @@ class SceneInfo(object):
 		return ruleDict
 
 
-	def _pathSep(self):
+	def pathSep(self):
 		"""
 		path separator 待跨平台測試
 		"""

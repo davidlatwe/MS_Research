@@ -7,14 +7,37 @@ Created on 2016.05.10
 import moSceneInfo
 
 
-
 def _getSceneInfo():
 	"""
 	"""
 	return moSceneInfo.SceneInfo()
 
 
-def rule_moGeoCache(assetName, sceneName= None):
+def rWorkingNamespace():
+	"""
+	"""
+	return ':mGeoCache'
+
+
+def rAssetNamespace(node):
+	"""
+	"""
+	return node.split(':')[0]
+
+
+def rViskeyNamespace():
+	"""
+	"""
+	return ':geoViskey'
+
+
+def rAssetName(nodeNS):
+	"""
+	"""
+	return nodeNS.split('_')[0]
+
+
+def rGeoCacheDir(assetName, sceneName= None):
 	"""
 	"""
 	sInfo = _getSceneInfo()
@@ -25,3 +48,28 @@ def rule_moGeoCache(assetName, sceneName= None):
 	geoCache_path = sInfo.sep.join([ rootPath, sceneName, assetName ])
 
 	return geoCache_path
+
+
+def rTransNameFilePath(geoCacheDir, assetName):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+
+	return geoCacheDir + sInfo.sep + assetName + '_trans.txt'
+
+
+def rXMLFilePath(geoCacheDir, assetName):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+
+	return geoCacheDir + sInfo.sep + assetName + '.xml'
+
+
+def rViskeyFilePath(geoCacheDir, assetName):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+
+	return geoCacheDir + sInfo.sep + assetName + '_viskey.ma'
+
