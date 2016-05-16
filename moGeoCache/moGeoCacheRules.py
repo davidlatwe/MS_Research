@@ -5,6 +5,7 @@ Created on 2016.05.10
 @author: davidpower
 '''
 import moSceneInfo
+reload(moSceneInfo)
 
 
 def _getSceneInfo():
@@ -54,8 +55,10 @@ def rTransNameFilePath(geoCacheDir, assetName):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-
-	return geoCacheDir + sInfo.sep + assetName + '_trans.txt'
+	filePath = geoCacheDir + sInfo.sep + assetName + '_trans.txt'
+	sInfo.makeDir(filePath)
+	
+	return filePath
 
 
 def rXMLFilePath(geoCacheDir, assetName):
@@ -70,6 +73,8 @@ def rViskeyFilePath(geoCacheDir, assetName):
 	"""
 	"""
 	sInfo = _getSceneInfo()
+	filePath = geoCacheDir + sInfo.sep + assetName + '_viskey.ma'
+	sInfo.makeDir(filePath)
 
-	return geoCacheDir + sInfo.sep + assetName + '_viskey.ma'
+	return filePath
 

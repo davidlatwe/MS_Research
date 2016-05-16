@@ -98,14 +98,16 @@ def exportGeoCache():
 		# loop vars
 		anim_meshes = tmpResult[0]
 		anim_viskey = tmpResult[1]
-		assetNamespace = moRules.rAssetNamespace(rootNode)
-		assetName = moRules.rAssetName(assetNamespace)
+		assetNS = moRules.rAssetNamespace(rootNode)
+		assetName = moRules.rAssetName(assetNS)
 		geoCacheDir = moRules.rGeoCacheDir(assetName)
 		
 		# Add and Set namespace
 		moMethod.mSetupWorkingNS(workingNS)
 
-		if anim_viskey and False:
+		if anim_viskey:
+			# bake visKey
+			moMethod.mBakeViskey(anim_viskey)
 			# collect all visibility animation node
 			visAniNodeList = moMethod.mDuplicateViskey(anim_viskey)
 			# export visKey
@@ -137,8 +139,8 @@ def importGeoCache(sceneName):
 
 	for rootNode in rootNode_List:
 		# loop vars
-		assetNamespace = moRules.rAssetNamespace(rootNode)
-		assetName = moRules.rAssetName(assetNamespace)
+		assetNS = moRules.rAssetNamespace(rootNode)
+		assetName = moRules.rAssetName(assetNS)
 		geoCacheDir = moRules.rGeoCacheDir(assetName, sceneName)
 		xmlFile = moRules.rXMLFilePath(geoCacheDir, assetName)
 		transFile = moRules.rTransNameFilePath(geoCacheDir, assetName)
@@ -153,15 +155,16 @@ def importGeoCache(sceneName):
 			mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
 		# get viskey from ma file
 		keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName)
-		if cmds.file(keyFile, q= 1, ex= 1) and False:
-			viskeyNamespace = moRules.rViskeyNamespace()
+		if cmds.file(keyFile, q= 1, ex= 1):
+			viskeyNS = moRules.rViskeyNamespace()
+			workingNS = moRules.rWorkingNamespace()
 			# import viskey
-			moMethod.mImportViskey(keyFile, assetNamespace, viskeyNamespace)
+			moMethod.mImportViskey(keyFile, assetNS, viskeyNS, workingNS)
 
 
 
 if __name__ == '__main__':
 	reload(moRules)
 	reload(moMethod)
-	exportGeoCache()
+	#exportGeoCache()
 	#importGeoCache('SOK_c01_anim_v01')

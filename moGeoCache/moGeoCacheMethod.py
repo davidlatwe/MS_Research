@@ -11,6 +11,7 @@ import mMaya.mGeneral as mGeneral
 import xml.dom.minidom as minidom
 
 
+
 def _chopNS(objName):
 		"""
 		remove top namespace and keep the rest
@@ -62,23 +63,53 @@ def mFilterOut(rootNode):
 	anim_meshes = _set(cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'mesh')) - itrm_meshes
 
 	''' # FILTER OUT # <constant hidden objects> '''
-	for obj in mOutliner.findHidden(rootNode):
-		# check if visibility has being connected to something like animCurve or expression
-		if not cmds.listConnections(obj + '.visibility'):
-			# no connection, check if transform obj has mesh child
-			if cmds.objectType(obj) == 'transform':
-				hiddenChild = _set(cmds.listRelatives(obj, ad= 1, f= 1))
-				if hiddenChild:
-					# remove hidden meshes
-					anim_meshes = anim_meshes - hiddenChild
-			if cmds.objectType(obj) == 'mesh':
-				# remove hidden mesh
-				anim_meshes.remove(obj)
-		else:
-			# do something if has key or expression connected to visibility
-			anim_viskey.append(obj)
+	for obj in cmds.listRelatives(rootNode, ad= 1, f= 1):
+		objShouldRemove = False
+		if cmds.attributeQuery('visibility', ex= 1, node = obj):
+			# check if visibility has being connected to something like animCurve, expression or drivenKey
+			if not cmds.listConnections(obj + '.v'):
+				if not cmds.getAttr(obj + '.v'):
+					objShouldRemove = True
+			else:
+				# do something if has key, expression or drivenKey connected to visibility
+				drivers = cmds.setDrivenKeyframe(obj + '.v', q= 1, dr= 1)
+				if drivers[0] == 'No drivers.':
+					# has key or expression
+					anim_viskey.append(obj)
+				else:
+					# is a driven obj
+					driverHasAni = 0
+					for driver in drivers:
+						if cmds.listConnections(driver, s= 1, d= 0):
+							# one of drivers has key or expression
+							anim_viskey.append(obj)
+							driverHasAni = 1
+							break
+					# driver has no animation, remove obj
+					if not driverHasAni:
+						if not cmds.getAttr(obj + '.v'):
+							objShouldRemove = True
+
+			if objShouldRemove:
+				# no visibility animation, check if transform obj has mesh or other child
+				if cmds.objectType(obj) == 'transform':
+					hiddenChild = _set(cmds.listRelatives(obj, ad= 1, f= 1))
+					if hiddenChild:
+						# remove hidden meshes
+						anim_meshes = anim_meshes - hiddenChild
+				if cmds.objectType(obj) == 'mesh':
+					# remove hidden mesh
+					if obj in anim_meshes:
+						anim_meshes.remove(obj)
 
 	return anim_meshes, anim_viskey
+
+
+def mBakeViskey(anim_viskey):
+	"""
+	"""
+	timeRange = (cmds.playbackOptions(q= 1, min= 1), cmds.playbackOptions(q= 1, max= 1))
+	cmds.bakeResults(anim_viskey, at= '.v', t= timeRange, sm= 1, s= 0)
 
 
 def mDuplicateViskey(anim_viskey):
@@ -86,19 +117,9 @@ def mDuplicateViskey(anim_viskey):
 	"""
 	visAniNodeList = []
 	for visNode in anim_viskey:
-		node = ''
-		aniNode = cmds.listConnections(visNode + '.visibility')
-		if cmds.objectType(aniNode[0]) == 'animCurve':
-			ctrlNode = cmds.listConnections(aniNode[0] + '.input', p= 1)
-			if ctrlNode:
-				aniNode = cmds.listConnections(ctrlNode[0], d= 0)
-				if aniNode:
-					node = aniNode[0]
-			else:
-				node = aniNode[0]
-		if node:
-			visAniNode = _chopNS(visNode)
-			visAniNodeList.append(cmds.duplicate(node, n= visAniNode)[0])
+		aniNode = cmds.listConnections(visNode + '.visibility')[0]
+		visAniNode = _chopNS(visNode)
+		visAniNodeList.append(cmds.duplicate(aniNode, n= visAniNode)[0])
 
 	return visAniNodeList
 
@@ -141,13 +162,12 @@ def mSmoothMesh(ves_grp):
 def mSaveTransformName(ves_grp, transFile):
 	"""
 	"""
-	transTxt = open(transFile, 'w')
-	for ves in cmds.listRelatives(ves_grp, c= 1):
-		transTxt.write(_chopNS(ves) + '\n')
-	transTxt.close()
+	with open(transFile, 'w') as transTxt:
+		for ves in cmds.listRelatives(ves_grp, c= 1):
+			transTxt.write(_chopNS(ves) + '\n')
 
 
-def mXMLMeshList(xmlFile, assetNamespace):
+def mXMLMeshList(xmlFile, assetNS):
 	"""
 	"""
 	# meshes need to process
@@ -156,7 +176,7 @@ def mXMLMeshList(xmlFile, assetNamespace):
 	Channels = minidom.parse(xmlFile).getElementsByTagName('Channels')[0]
 	for ChannelName in Channels.childNodes:
 		if ChannelName.nodeType == ChannelName.ELEMENT_NODE:
-			meshName = assetNamespace + ':' + _chopNS(ChannelName.getAttribute('ChannelName'))
+			meshName = assetNS + ':' + _chopNS(ChannelName.getAttribute('ChannelName'))
 			anim_meshes.append(meshName)
 
 	return anim_meshes
@@ -180,15 +200,18 @@ def mTXTTransList(transFile, rootNode):
 
 
 
-def mImportViskey(keyFile, assetNamespace, viskeyNamespace):
+def mImportViskey(keyFile, assetNS, viskeyNS, workingNS):
 	"""
 	"""
-	viskeyNamespace = assetNamespace + viskeyNamespace
-	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNamespace)
-	visAniNodeList = cmds.namespaceInfo(viskeyNamespace, lod= 1)
+	viskeyNS = assetNS + viskeyNS
+	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNS)
+	visAniNodeList = cmds.namespaceInfo(viskeyNS + workingNS, lod= 1)
 	for visAniNode in visAniNodeList:
-		visAniMesh = assetNamespace + ':' + visAniNode
-		cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
+		visAniMesh = assetNS + ':' + visAniNode.split(viskeyNS + workingNS)[1]
+		try:
+			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
+		except:
+			print 'viskey import Faild:  ' + visAniNode
 
 
 def mCleanWorkingNS(workingNS):
