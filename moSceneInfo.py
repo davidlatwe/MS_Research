@@ -40,6 +40,13 @@ class SceneInfo(object):
 		self.cutId = []
 		# camera list
 		self.cam = []
+		# palybackRange
+		self.palybackStart = cmds.playbackOptions(q= 1, min= 1)
+		self.palybackEnd = cmds.playbackOptions(q= 1, max= 1)
+		# frameRate
+		self.fps = mel.eval('currentTimeUnitToFPS')
+		self.timeUnit = cmds.currentUnit(q= 1, t= 1)
+
 
 
 	def getDirRules(self):

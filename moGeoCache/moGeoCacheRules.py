@@ -6,6 +6,7 @@ Created on 2016.05.10
 '''
 import moSceneInfo
 reload(moSceneInfo)
+# r for Rule
 
 
 def _getSceneInfo():
@@ -36,6 +37,22 @@ def rAssetName(nodeNS):
 	"""
 	"""
 	return nodeNS.split('_')[0]
+
+
+def rPlaybackRange():
+	"""
+	"""
+	sInfo = _getSceneInfo()
+
+	return (sInfo.palybackStart, sInfo.palybackEnd)
+
+
+def rFrameRate():
+	"""
+	"""
+	sInfo = _getSceneInfo()
+
+	return sInfo.timeUnit
 
 
 def rGeoCacheDir(assetName, sceneName= None):
@@ -78,3 +95,12 @@ def rViskeyFilePath(geoCacheDir, assetName):
 
 	return filePath
 
+
+def rTimeInfoFilePath(geoCacheDir, assetName):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+	filePath = geoCacheDir + sInfo.sep + assetName + '_timeInfo.txt'
+	sInfo.makeDir(filePath)
+
+	return filePath

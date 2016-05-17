@@ -9,7 +9,7 @@ import maya.mel as mel
 import mMaya.mOutliner as mOutliner
 import mMaya.mGeneral as mGeneral
 import xml.dom.minidom as minidom
-
+# m for Method
 
 
 def _chopNS(objName):
@@ -17,6 +17,18 @@ def _chopNS(objName):
 		remove top namespace and keep the rest
 		"""
 		return ':'.join(objName.split(':')[1:])
+
+
+def mCleanWorkingNS(workingNS):
+	"""
+	"""
+	mGeneral.namespaceDel(workingNS)
+
+
+def mSetupWorkingNS(workingNS):
+	"""
+	"""
+	mGeneral.namespaceSet(workingNS)
 
 
 def mProcQueue():
@@ -105,11 +117,10 @@ def mFilterOut(rootNode):
 	return anim_meshes, anim_viskey
 
 
-def mBakeViskey(anim_viskey):
+def mBakeViskey(anim_viskey, playbackRange):
 	"""
 	"""
-	timeRange = (cmds.playbackOptions(q= 1, min= 1), cmds.playbackOptions(q= 1, max= 1))
-	cmds.bakeResults(anim_viskey, at= '.v', t= timeRange, sm= 1, s= 0)
+	cmds.bakeResults(anim_viskey, at= '.v', t= playbackRange, sm= 1, s= 0)
 
 
 def mDuplicateViskey(anim_viskey):
@@ -167,7 +178,24 @@ def mSaveTransformName(ves_grp, transFile):
 			transTxt.write(_chopNS(ves) + '\n')
 
 
-def mXMLMeshList(xmlFile, assetNS):
+def mTXTTransList(transFile, rootNode):
+	"""
+	"""
+	# transform nodes need to select
+	anim_trans = []
+	target_trans = cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'transform')
+
+	with open(transFile, 'r') as transTxt:
+		for trans in transTxt:
+			for target in target_trans:
+				if target.endswith(trans.strip()) and not 'LP_geo_grp' in target:
+					anim_trans.append(target)
+					break
+
+	return list(set(anim_trans))
+
+
+def mXMLAllGeoMeshList(xmlFile, assetNS):
 	"""
 	"""
 	# meshes need to process
@@ -176,51 +204,130 @@ def mXMLMeshList(xmlFile, assetNS):
 	Channels = minidom.parse(xmlFile).getElementsByTagName('Channels')[0]
 	for ChannelName in Channels.childNodes:
 		if ChannelName.nodeType == ChannelName.ELEMENT_NODE:
-			meshName = assetNS + ':' + _chopNS(ChannelName.getAttribute('ChannelName'))
+			meshName = ChannelName.getAttribute('ChannelName')
 			anim_meshes.append(meshName)
 
 	return anim_meshes
 
 
-def mTXTTransList(transFile, rootNode):
+def mXMLOneGeoMeshList():
 	"""
 	"""
-	# transform nodes need to select
-	anim_trans = []
-	target_trans = cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'transform')
+	# not compelete
+	'''
+	files = os.listdir(cacheDir)
+	for file in files:
+		if file.endswith('.xml'):
+			cacheFile = cacheDir + os.sep + file
+			reflist = minidom.parse(cacheFile).getElementsByTagName('channel0')
+			fileObj = reflist[0].attributes['ChannelName'].value
+	'''
+	pass
 
-	transTxt = open(transFile, 'r')
-	for trans in transTxt:
-		for target in target_trans:
-			if target.endswith(trans.strip()) and not 'LP_geo_grp' in target:
-				anim_trans.append(target)
-				break
 
-	return list(set(anim_trans))
-
+def mExportViskey(keyFile):
+	"""
+	輸出 visible key
+	"""
+	cmds.file(keyFile, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
 
 
 def mImportViskey(keyFile, assetNS, viskeyNS, workingNS):
 	"""
 	"""
-	viskeyNS = assetNS + viskeyNS
-	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= viskeyNS)
-	visAniNodeList = cmds.namespaceInfo(viskeyNS + workingNS, lod= 1)
+	importNS = assetNS + viskeyNS
+	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= importNS)
+	visAniNodeList = cmds.namespaceInfo(importNS + workingNS, lod= 1)
 	for visAniNode in visAniNodeList:
-		visAniMesh = assetNS + ':' + visAniNode.split(viskeyNS + workingNS)[1]
+		visAniMesh = assetNS + ':' + visAniNode.split(importNS + workingNS)[1]
 		try:
 			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
 		except:
-			print 'viskey import Faild:  ' + visAniNode
+			cmds.warning('// moGeoCache: viskey target not found:  ' + visAniNode)
 
 
-def mCleanWorkingNS(workingNS):
+def mExportGeoCache(geoCacheDir, assetName):
 	"""
+	設定 geoCache 參數並執行
 	"""
-	mGeneral.namespaceDel(workingNS)
+	# doCreateGeometryCache( int $version, string $args[] )
+	# C:/Program Files/Autodesk/Maya2016/scripts/others/doCreateGeometryCache.mel
+	version = 6
+
+	def _gcArgs():
+		# time range mode:
+		# 		mode = 0 : use $args[1] and $args[2] as start-end
+		# 		mode = 1 : use render globals
+		# 		mode = 2 : use timeline
+		timerangeMode = 2
+		# start frame (if time range mode == 0)
+		startFrame = 0
+		# end frame (if time range mode == 0)
+		endFrame = 0
+		# cache file distribution, either "OneFile" or "OneFilePerFrame"
+		cacheDistr = 'OneFilePerFrame'
+		# 0/1, whether to refresh during caching
+		refresh = '0'
+		# directory for cache files, if "", then use project data dir
+		cacheDir = geoCacheDir
+		# 0/1, whether to create a cache per geometry
+		perGeo = 0
+		# name of cache file. An empty string can be used to specify that an auto-generated name is acceptable.
+		cacheName = assetName
+		# 0/1, whether the specified cache name is to be used as a prefix
+		usePrefix = 0
+		# action to perform: "add", "replace", "merge", "mergeDelete" or "export"
+		action = 'export'
+		# force save even if it overwrites existing files
+		force = 1
+		# simulation rate, the rate at which the cloth simulation is forced to run
+		simRate = 1
+		# sample mulitplier, the rate at which samples are written, as a multiple of simulation rate.
+		sample = 1
+		# 0/1, whether modifications should be inherited from the cache about to be replaced. Valid only when action = "replace".
+		inherited = 0
+		# 0/1, whether to store doubles as floats
+		storeFloat = 1
+		# name of cache format: "mcc", "mcx"
+		cFormat = 'mcx'
+		# 0/1, whether to export in local or world space
+		space = 0
+
+		return locals()
+
+	def _qts(var):
+		# surround string with double quote
+		return '"' + str(var) + '"'
+
+	# get all geoCache inputs value 
+	args = [ _qts(_gcArgs()[var]) for var in _gcArgs.__code__.co_varnames ]
+	# make cmd and do GeoCache
+	evalCmd = 'doCreateGeometryCache ' + str(version) + ' {' + ', '.join(args) + '};'
+	#print evalCmd
+	mel.eval(evalCmd)
 
 
-def mSetupWorkingNS(workingNS):
+def mImportGeoCache(xmlFile):
 	"""
 	"""
-	mGeneral.namespaceSet(workingNS)
+	mel.eval('source doImportCacheArgList')
+	mel.eval('if(catch(`deleteCacheFile 3 { "keep", "", "geometry" }`)){warning "// moGeoCache: No caches.";}')
+	mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+
+
+def mExportTimeInfo(timeInfoFile, timeUnit, playbackRange):
+	"""
+	"""
+	timeInfo = timeUnit + '\n' + str(playbackRange[0]) + ':' + str(playbackRange[1])
+	with open(timeInfoFile, 'w') as timeInfoTxt:
+		timeInfoTxt.write(timeInfo)
+
+
+def mImportTimeInfo(timeInfoFile):
+	"""
+	"""
+	with open(timeInfoFile, 'r') as timeInfoTxt:
+		timeInfo = timeInfoTxt.read().split('\n')
+		cmds.currentUnit(t= timeInfo[0])
+		cmds.playbackOptions(q= 1, min= float(timeInfo[1].split(':')[0]))
+		cmds.playbackOptions(q= 1, max= float(timeInfo[1].split(':')[1]))
