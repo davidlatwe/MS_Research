@@ -1,0 +1,108 @@
+//Maya 2016 Project Definition
+
+// scenes
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+workspace -fr "mayaAscii" "1-scenes";
+workspace -fr "mayaBinary" "1-scenes";
+workspace -fr "scene" "1-scenes";
+//workspace -fr "offlineEdit" "1-scenes/edits";
+
+// render images
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+string $rootPath = `workspace -q -rd`;
+string $imgPath = `substitute "1-Project" $rootPath "2-Render"`;
+workspace -fr "images" $imgPath;
+
+// movies
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+workspace -fr "movie" $imgPath;
+
+// texture sourceimages
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+workspace -fr "sourceImages" "2-sourceimages";
+//workspace -fr "3dPaintTextures" "2-sourceimages/3dPaintTextures";
+
+// cache
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+workspace -fr "fileCache" "4-cache/nCache";
+workspace -fr "fluidCache" "4-cache/fluid";
+workspace -fr "bifrostCache" "4-cache/bifrost";
+workspace -fr "particles" "4-cache/particles";
+
+// renderData
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+workspace -fr "furShadowMap" "5-renderData/fur/furShadowMap";
+workspace -fr "shaders" "5-renderData/shaders";
+workspace -fr "furFiles" "5-renderData/fur/furFiles";
+workspace -fr "furEqualMap" "5-renderData/fur/furEqualMap";
+workspace -fr "iprImages" "5-renderData/iprImages";
+workspace -fr "renderData" "5-renderData";
+workspace -fr "furImages" "5-renderData/fur/furImages";
+workspace -fr "depth" "5-renderData/depth";
+workspace -fr "furAttrMap" "5-renderData/fur/furAttrMap";
+
+// assets
+//workspace -fr "templates" "6-assets";
+
+// clips
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//workspace -fr "clips" "6-clips";
+
+// sound
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//workspace -fr "sound" "7-sound";
+//workspace -fr "audio" "7-sound";
+
+// scripts
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//workspace -fr "scripts" "8-scripts";
+//workspace -fr "mel" "8-scripts";
+
+// autosave
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//workspace -fr "autoSave" "9-autosave";
+
+
+
+// data obj
+workspace -fr "OBJ" "3-data/obj";
+workspace -fr "OBJexport" "3-data/obj";
+// data fbx
+workspace -fr "FBX" "3-data/fbx";
+workspace -fr "DAE_FBX" "3-data/fbx";
+workspace -fr "DAE_FBX export" "3-data/fbx";
+workspace -fr "FBX export" "3-data/fbx";
+// data abc
+workspace -fr "Alembic" "3-data/abc";
+// data
+workspace -fr "JT_DC" "3-data";
+workspace -fr "CATIAV4_DC" "3-data";
+workspace -fr "STEP_DC" "3-data";
+workspace -fr "SPF_DCE" "3-data";
+workspace -fr "CATIAV5_DC" "3-data";
+workspace -fr "Autodesk Packet File" "3-data";
+workspace -fr "SPF_DC" "3-data";
+workspace -fr "DXF_DCE" "3-data";
+workspace -fr "move" "3-data";
+workspace -fr "ZPR_DCE" "3-data";
+workspace -fr "STL_DCE" "3-data";
+workspace -fr "studioImport" "3-data";
+workspace -fr "DXF_DC" "3-data";
+workspace -fr "UG_DCE" "3-data";
+workspace -fr "eps" "3-data";
+workspace -fr "translatorData" "3-data";
+workspace -fr "IV_DC" "3-data";
+workspace -fr "DWG_DCE" "3-data";
+workspace -fr "PTC_DC" "3-data";
+workspace -fr "STL_DC" "3-data";
+workspace -fr "IPT_DC" "3-data";
+workspace -fr "CSB_DC" "3-data";
+workspace -fr "SW_DC" "3-data";
+workspace -fr "DWG_DC" "3-data";
+workspace -fr "IGES_DCE" "3-data";
+workspace -fr "illustrator" "3-data";
+workspace -fr "diskCache" "3-data";
+workspace -fr "UG_DC" "3-data";
+workspace -fr "IGES_DC" "3-data";
+
+

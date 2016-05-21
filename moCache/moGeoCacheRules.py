@@ -4,9 +4,11 @@ Created on 2016.05.10
 
 @author: davidpower
 '''
+import re
+import logging
+logger = logging.getLogger('MayaOil.moGeocache.Rules')
+
 import moSceneInfo
-reload(moSceneInfo)
-# r for Rule
 
 
 def _getSceneInfo():
@@ -15,28 +17,29 @@ def _getSceneInfo():
 	return moSceneInfo.SceneInfo()
 
 
-def rWorkingNamespace():
+def rWorkingNS():
 	"""
 	"""
-	return ':mGeoCache'
+	return ':moGeoCache'
 
 
-def rAssetNamespace(node):
+def rViskeyNS():
+	"""
+	"""
+	return ':moGeoCacheViskey'
+
+
+def rAssetNS(node):
 	"""
 	"""
 	return node.split(':')[0]
 
 
-def rViskeyNamespace():
-	"""
-	"""
-	return ':geoViskey'
-
-
 def rAssetName(nodeNS):
 	"""
+	Return basename and id string, if nodeNS ends with digi
 	"""
-	return nodeNS.split('_')[0]
+	return nodeNS.split('_')[0] + re.sub('.*?([0-9]*)$', r'\1', nodeNS)
 
 
 def rPlaybackRange():
@@ -63,27 +66,33 @@ def rGeoCacheDir(assetName, sceneName= None):
 	rootPath = sInfo.workspaceRoot + sInfo.dirRule['moGeoCache']
 	if sceneName is None:
 		sceneName = sInfo.sceneSplitExt
-	geoCache_path = sInfo.sep.join([ rootPath, sceneName, assetName ])
+	geoCache_path = sInfo.sep.join([ rootPath, assetName, sceneName ])
 
 	return geoCache_path
 
 
-def rTransNameFilePath(geoCacheDir, assetName):
+def rXMLFileName(assetName, workingNS, anim_shape):
+	"""
+	"""
+	return '_'.join([ assetName, workingNS, anim_shape ])
+
+
+def rGeoListFilePath(geoCacheDir, assetName):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-	filePath = geoCacheDir + sInfo.sep + assetName + '_trans.txt'
+	filePath = geoCacheDir + sInfo.sep + assetName + '_geoList.txt'
 	sInfo.makeDir(filePath)
 	
 	return filePath
 
 
-def rXMLFilePath(geoCacheDir, assetName):
+def rXMLFilePath(geoCacheDir, xmlFileName):
 	"""
 	"""
 	sInfo = _getSceneInfo()
 
-	return geoCacheDir + sInfo.sep + assetName + '.xml'
+	return geoCacheDir + sInfo.sep + xmlFileName + '.xml'
 
 
 def rViskeyFilePath(geoCacheDir, assetName):

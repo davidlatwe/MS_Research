@@ -4,19 +4,13 @@ Created on 2016.05.12
 
 @author: davidpower
 '''
+import logging
+logger = logging.getLogger('MayaOil.moGeocache.Method')
+
 import maya.cmds as cmds
 import maya.mel as mel
 import mMaya.mOutliner as mOutliner
 import mMaya.mGeneral as mGeneral
-import xml.dom.minidom as minidom
-# m for Method
-
-
-def _chopNS(objName):
-		"""
-		remove top namespace and keep the rest
-		"""
-		return ':'.join(objName.split(':')[1:])
 
 
 def mCleanWorkingNS(workingNS):
@@ -35,22 +29,12 @@ def mProcQueue():
 	"""
 	傳回物件清單，可建立不同入列規則來產生不同範圍的物件清單
 	"""
-	expListTmp = []
+	expList = []
 
 	''' list out objs '''
-	#<< get selection's root transform node >>
-	expListTmp = mOutliner.findRoot('transform')
-	#<< direct using selection >>
-	#expListTmp = cmds.ls(sl= 1)
-	#<< non-gui mode >>
-	#pass
-
-	''' check if obj in a namespace '''
-	expList = expListTmp
-	for obj in expListTmp:
-		if len(obj.split(':')) > 2:
-			if not obj.split(':')[1]:
-				expList.remove(obj)
+	# << get selection's root transform node >>
+	expList = mOutliner.findRoot('transform')
+	expList.sort()
 
 	return expList
 
@@ -129,8 +113,7 @@ def mDuplicateViskey(anim_viskey):
 	visAniNodeList = []
 	for visNode in anim_viskey:
 		aniNode = cmds.listConnections(visNode + '.visibility')[0]
-		visAniNode = _chopNS(visNode)
-		visAniNodeList.append(cmds.duplicate(aniNode, n= visAniNode)[0])
+		visAniNodeList.append(cmds.duplicate(aniNode, n= visNode)[0])
 
 	return visAniNodeList
 
@@ -143,11 +126,11 @@ def mPolyUniteMesh(anim_meshes):
 	# convert meshes by polyUnite node into geoCaching carrier
 	for animShpae in anim_meshes:
 		# get transform node's name without namespace
-		animTrans = _chopNS(cmds.listRelatives(animShpae, p= 1)[0])
+		animTrans = cmds.listRelatives(animShpae, p= 1)[0]
 		# create a polyCube as a carrier for geoCaching and match name 
 		vesTrans = cmds.polyCube(n= animTrans, ch= 0)[0]
 		# rename polyCube's shape node to match name
-		vesShape = cmds.rename(cmds.listRelatives(vesTrans, s= 1)[0], _chopNS(animShpae))
+		vesShape = cmds.rename(cmds.listRelatives(vesTrans, s= 1)[0], animShpae)
 		# put in to the geoCaching carrier's group
 		cmds.parent(vesTrans, ves_grp)
 		# create polyUnite node
@@ -160,69 +143,43 @@ def mPolyUniteMesh(anim_meshes):
 	return ves_grp
 
 
-def mSmoothMesh(ves_grp):
+def mSmoothMesh(ves_grp, excludeList):
 	"""
 	"""
 	for ves in cmds.listRelatives(ves_grp, c= 1):
-		cmds.polySmooth(ves, mth= 0, sdt= 2, ovb= 1, ofb= 3, ofc= 0, ost= 1,
-								ocr= 0, dv= 1, bnr= 1 ,c= 1, kb= 1, ksb= 1,
-								khe= 0, kt= 1, kmb= 1, suv= 1, peh= 0, sl= 1,
-								dpe= 1, ps= 0.1, ro= 1, ch= 0)
+		if ves.split(':')[-1] not in excludeList:
+			cmds.polySmooth(ves, mth= 0, sdt= 2, ovb= 1, ofb= 3, ofc= 0, ost= 1,
+									ocr= 0, dv= 1, bnr= 1 ,c= 1, kb= 1, ksb= 1,
+									khe= 0, kt= 1, kmb= 1, suv= 1, peh= 0, sl= 1,
+									dpe= 1, ps= 0.1, ro= 1, ch= 0)
 
 
-def mSaveTransformName(ves_grp, transFile):
+def mSaveGeoList(ves_grp, geoListFile):
 	"""
 	"""
-	with open(transFile, 'w') as transTxt:
+	with open(geoListFile, 'w') as geoTxt:
 		for ves in cmds.listRelatives(ves_grp, c= 1):
-			transTxt.write(_chopNS(ves) + '\n')
+			vesShape = cmds.listRelatives(ves, s= 1)[0]
+			geoTxt.write(ves.split(':')[-1] + '@' + vesShape.split(':')[-1] + '\n')
 
 
-def mTXTTransList(transFile, rootNode):
+def mTXTGeoList(geoListFile, rootNode):
 	"""
 	"""
 	# transform nodes need to select
-	anim_trans = []
-	target_trans = cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'transform')
+	anim_geoList = {}
+	target_trans = cmds.listRelatives(rootNode, ad= 1, typ= 'transform')
 
-	with open(transFile, 'r') as transTxt:
-		for trans in transTxt:
+	with open(geoListFile, 'r') as geoTxt:
+		for geo in geoTxt:
+			geo_trans = geo.strip().split('@')[0]
+			geo_shape = geo.strip().split('@')[1]
 			for target in target_trans:
-				if target.endswith(trans.strip()) and not 'LP_geo_grp' in target:
-					anim_trans.append(target)
+				if target.split(':')[-1] == geo_trans and not 'LP_geo_grp' in target:
+					anim_geoList[target] = geo_shape
 					break
 
-	return list(set(anim_trans))
-
-
-def mXMLAllGeoMeshList(xmlFile, assetNS):
-	"""
-	"""
-	# meshes need to process
-	anim_meshes = []
-
-	Channels = minidom.parse(xmlFile).getElementsByTagName('Channels')[0]
-	for ChannelName in Channels.childNodes:
-		if ChannelName.nodeType == ChannelName.ELEMENT_NODE:
-			meshName = ChannelName.getAttribute('ChannelName')
-			anim_meshes.append(meshName)
-
-	return anim_meshes
-
-
-def mXMLOneGeoMeshList():
-	"""
-	"""
-	# not compelete
-	'''
-	files = os.listdir(cacheDir)
-	for file in files:
-		if file.endswith('.xml'):
-			cacheFile = cacheDir + os.sep + file
-			reflist = minidom.parse(cacheFile).getElementsByTagName('channel0')
-			fileObj = reflist[0].attributes['ChannelName'].value
-	'''
-	pass
+	return anim_geoList
 
 
 def mExportViskey(keyFile):
@@ -232,18 +189,18 @@ def mExportViskey(keyFile):
 	cmds.file(keyFile, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
 
 
-def mImportViskey(keyFile, assetNS, viskeyNS, workingNS):
+def mImportViskey(keyFile, assetNS, viskeyNS):
 	"""
 	"""
-	importNS = assetNS + viskeyNS
-	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, ra= 1, ns= importNS)
-	visAniNodeList = cmds.namespaceInfo(importNS + workingNS, lod= 1)
+	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, mnr= 1)
+	visAniNodeList = cmds.namespaceInfo(viskeyNS, lod= 1)
 	for visAniNode in visAniNodeList:
-		visAniMesh = assetNS + ':' + visAniNode.split(importNS + workingNS)[1]
 		try:
+			targetList = cmds.ls('*' + visAniNode.split(':')[1], r= 1, l= 1)
+			visAniMesh = [target for target in targetList if target.startswith(assetNS)][0]
 			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
 		except:
-			cmds.warning('// moGeoCache: viskey target not found:  ' + visAniNode)
+			logger.warning('viskey target not found:  ' + visAniNode)
 
 
 def mExportGeoCache(geoCacheDir, assetName):
@@ -271,11 +228,11 @@ def mExportGeoCache(geoCacheDir, assetName):
 		# directory for cache files, if "", then use project data dir
 		cacheDir = geoCacheDir
 		# 0/1, whether to create a cache per geometry
-		perGeo = 0
+		perGeo = 1
 		# name of cache file. An empty string can be used to specify that an auto-generated name is acceptable.
 		cacheName = assetName
 		# 0/1, whether the specified cache name is to be used as a prefix
-		usePrefix = 0
+		usePrefix = 1
 		# action to perform: "add", "replace", "merge", "mergeDelete" or "export"
 		action = 'export'
 		# force save even if it overwrites existing files
@@ -303,15 +260,19 @@ def mExportGeoCache(geoCacheDir, assetName):
 	args = [ _qts(_gcArgs()[var]) for var in _gcArgs.__code__.co_varnames ]
 	# make cmd and do GeoCache
 	evalCmd = 'doCreateGeometryCache ' + str(version) + ' {' + ', '.join(args) + '};'
-	#print evalCmd
+	logger.debug(evalCmd)
 	mel.eval(evalCmd)
 
 
-def mImportGeoCache(xmlFile):
+def mImportGeoCache(xmlFile, assetNS, anim_trans):
 	"""
 	"""
+	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1)
+	anim_trans = [target for target in targetList if target.startswith('|' + assetNS) and not 'LP_geo_grp' in target][0]
+	cmds.select(anim_trans, r= 1);logger.debug(anim_trans)
 	mel.eval('source doImportCacheArgList')
 	mel.eval('if(catch(`deleteCacheFile 3 { "keep", "", "geometry" }`)){warning "// moGeoCache: No caches.";}')
+	#mel.eval('if(catch(`deleteCacheFile 3 {"keep", "", "geometry"}`)){python "logger.warning(\"No caches Del.\")";}')
 	mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
 
 
@@ -331,3 +292,14 @@ def mImportTimeInfo(timeInfoFile):
 		cmds.currentUnit(t= timeInfo[0])
 		cmds.playbackOptions(q= 1, min= float(timeInfo[1].split(':')[0]))
 		cmds.playbackOptions(q= 1, max= float(timeInfo[1].split(':')[1]))
+
+
+def mGetSmoothExcludeList():
+	"""
+	"""
+	return ['R_eye_geo3',
+			'R_eye_geo2',
+			'L_eye_geo3',
+			'L_eye_geo2',
+			'R_arm_cloth_geo4'
+			]
