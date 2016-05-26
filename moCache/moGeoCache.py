@@ -19,6 +19,8 @@ def exportGeoCache(smooth):
 	"""
 	輸出 geoCache
 	"""
+	logger.info('GeoCache export init.')
+
 	# namespace during action
 	workingNS = moRules.rWorkingNS()
 	viskeyNS = moRules.rViskeyNS()
@@ -34,7 +36,12 @@ def exportGeoCache(smooth):
 	# remove mGCVisKey namespace
 	moMethod.mCleanWorkingNS(viskeyNS)
 
+	logger.info('GeoCache export start.')
+	logger.info('export queue: ' + str(len(rootNode_List)))
+
 	for rootNode in rootNode_List:
+		logger.info('[' + rootNode + '] geoCaching.')
+
 		# FILTER OUT <intermediate objects> & <constant hidden objects>
 		filterResult = moMethod.mFilterOut(rootNode)
 		# loop vars
@@ -47,7 +54,8 @@ def exportGeoCache(smooth):
 
 		if anim_viskey:
 			# Add and Set namespace
-			moMethod.mSetupWorkingNS(viskeyNS);logger.info('viskeyNS Set.')
+			logger.info('viskeyNS: <' + viskeyNS + '> Set.')
+			moMethod.mSetupWorkingNS(viskeyNS)
 			# bake visKey
 			moMethod.mBakeViskey(anim_viskey, playbackRange)
 			# collect all visibility animation node
@@ -57,11 +65,15 @@ def exportGeoCache(smooth):
 			keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName)
 			moMethod.mExportViskey(keyFile)
 			# remove mGCVisKey namespace
-			moMethod.mCleanWorkingNS(viskeyNS);logger.info('viskeyNS Set.')
+			logger.info('viskeyNS: <' + viskeyNS + '> Del.')
+			moMethod.mCleanWorkingNS(viskeyNS)
+		else:
+			logger.info('No visibility key.')
 
 		if anim_meshes:
 			# Add and Set namespace
-			moMethod.mSetupWorkingNS(workingNS);logger.info('workingNS Del.')
+			logger.info('workingNS: <' + workingNS + '> Set.')
+			moMethod.mSetupWorkingNS(workingNS)
 			# polyUnite
 			ves_grp = moMethod.mPolyUniteMesh(anim_meshes)
 			# subDiv before export
@@ -74,11 +86,19 @@ def exportGeoCache(smooth):
 			cmds.select(ves_grp, r= 1, hi= 1)
 			moMethod.mExportGeoCache(geoCacheDir, assetName)
 			# remove mGC namespace
-			moMethod.mCleanWorkingNS(workingNS);logger.info('workingNS Del.')
+			logger.info('workingNS: <' + workingNS + '> Del.')
+			moMethod.mCleanWorkingNS(workingNS)
+		else:
+			logger.info('No mesh to cache.')
 
 		# note down frameRate and playback range
 		timeInfoFile = moRules.rTimeInfoFilePath(geoCacheDir, assetName)
 		moMethod.mExportTimeInfo(timeInfoFile, timeUnit, playbackRange)
+		logger.info('TimeInfo exported.')
+
+		logger.info('[' + rootNode + '] geoCached.')
+
+	logger.info('GeoCache export completed.')
 
 
 def importGeoCache(sceneName):
@@ -97,18 +117,19 @@ def importGeoCache(sceneName):
 		assetNS = moRules.rAssetNS(rootNode)
 		assetName = moRules.rAssetName(assetNS)
 		geoCacheDir = moRules.rGeoCacheDir(assetName, sceneName)
+		conflictList = moMethod.mGetGeoCacheConflictList()
 
 		# get transform list from txt file
 		geoListFile = moRules.rGeoListFilePath(geoCacheDir, assetName)
 		if cmds.file(geoListFile, q= 1, ex= 1):
-			anim_geoList = moMethod.mTXTGeoList(geoListFile, rootNode)
+			anim_geoList = moMethod.mLoadGeoList(geoListFile, rootNode)
 			# import GeoCache
 			for anim_trans in anim_geoList.keys():
 				anim_shape = anim_geoList[anim_trans]
-				xmlFile = moRules.rXMLFilePath(geoCacheDir, moRules.rXMLFileName(assetName, workingNS.split(':')[1], anim_shape))
+				xmlFile = moRules.rXMLFilePath(geoCacheDir, moRules.rXMLFileName(assetName, workingNS, anim_shape))
 				logger.debug(xmlFile)
 				if cmds.file(xmlFile, q= 1, ex= 1):
-					moMethod.mImportGeoCache(xmlFile, assetNS, anim_trans)
+					moMethod.mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList)
 
 		# get viskey from ma file
 		keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName)

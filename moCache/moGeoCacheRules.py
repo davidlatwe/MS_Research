@@ -9,6 +9,7 @@ import logging
 logger = logging.getLogger('MayaOil.moGeocache.Rules')
 
 import moSceneInfo
+reload(moSceneInfo)
 
 
 def _getSceneInfo():
@@ -62,11 +63,16 @@ def rGeoCacheDir(assetName, sceneName= None):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-
 	rootPath = sInfo.workspaceRoot + sInfo.dirRule['moGeoCache']
+	isMakeDir = False
 	if sceneName is None:
 		sceneName = sInfo.sceneSplitExt
+		isMakeDir = True
+
 	geoCache_path = sInfo.sep.join([ rootPath, assetName, sceneName ])
+
+	if isMakeDir:
+		sInfo.makeDir(geoCache_path)
 
 	return geoCache_path
 
@@ -74,7 +80,7 @@ def rGeoCacheDir(assetName, sceneName= None):
 def rXMLFileName(assetName, workingNS, anim_shape):
 	"""
 	"""
-	return '_'.join([ assetName, workingNS, anim_shape ])
+	return '_'.join([ assetName, workingNS.split(':')[1], anim_shape ])
 
 
 def rGeoListFilePath(geoCacheDir, assetName):
@@ -82,7 +88,6 @@ def rGeoListFilePath(geoCacheDir, assetName):
 	"""
 	sInfo = _getSceneInfo()
 	filePath = geoCacheDir + sInfo.sep + assetName + '_geoList.txt'
-	sInfo.makeDir(filePath)
 	
 	return filePath
 
@@ -100,7 +105,6 @@ def rViskeyFilePath(geoCacheDir, assetName):
 	"""
 	sInfo = _getSceneInfo()
 	filePath = geoCacheDir + sInfo.sep + assetName + '_viskey.ma'
-	sInfo.makeDir(filePath)
 
 	return filePath
 
@@ -110,6 +114,5 @@ def rTimeInfoFilePath(geoCacheDir, assetName):
 	"""
 	sInfo = _getSceneInfo()
 	filePath = geoCacheDir + sInfo.sep + assetName + '_timeInfo.txt'
-	sInfo.makeDir(filePath)
 
 	return filePath

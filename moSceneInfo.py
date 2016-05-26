@@ -68,9 +68,12 @@ class SceneInfo(object):
 		return sep
 
 
-	def makeDir(self, filePath):
+	def makeDir(self, filePath, isFile= None):
 		"""
 		create folder if not exists
 		"""
-		if not os.path.exists(os.path.dirname(filePath)):
-			os.makedirs(os.path.dirname(filePath))
+		if isFile is not None:
+			filePath = os.path.dirname(filePath)
+
+		if not os.path.exists(filePath):
+			os.makedirs(filePath)

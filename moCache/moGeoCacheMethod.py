@@ -126,7 +126,7 @@ def mPolyUniteMesh(anim_meshes):
 	# convert meshes by polyUnite node into geoCaching carrier
 	for animShpae in anim_meshes:
 		# get transform node's name without namespace
-		animTrans = cmds.listRelatives(animShpae, p= 1)[0]
+		animTrans = cmds.listRelatives(animShpae, p= 1)[0].split(':')[-1]
 		# create a polyCube as a carrier for geoCaching and match name 
 		vesTrans = cmds.polyCube(n= animTrans, ch= 0)[0]
 		# rename polyCube's shape node to match name
@@ -163,21 +163,16 @@ def mSaveGeoList(ves_grp, geoListFile):
 			geoTxt.write(ves.split(':')[-1] + '@' + vesShape.split(':')[-1] + '\n')
 
 
-def mTXTGeoList(geoListFile, rootNode):
+def mLoadGeoList(geoListFile, rootNode):
 	"""
 	"""
-	# transform nodes need to select
 	anim_geoList = {}
-	target_trans = cmds.listRelatives(rootNode, ad= 1, typ= 'transform')
 
 	with open(geoListFile, 'r') as geoTxt:
 		for geo in geoTxt:
 			geo_trans = geo.strip().split('@')[0]
 			geo_shape = geo.strip().split('@')[1]
-			for target in target_trans:
-				if target.split(':')[-1] == geo_trans and not 'LP_geo_grp' in target:
-					anim_geoList[target] = geo_shape
-					break
+			anim_geoList[geo_trans] = geo_shape
 
 	return anim_geoList
 
@@ -200,7 +195,7 @@ def mImportViskey(keyFile, assetNS, viskeyNS):
 			visAniMesh = [target for target in targetList if target.startswith(assetNS)][0]
 			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
 		except:
-			logger.warning('viskey target not found:  ' + visAniNode)
+			logger.warning('viskey target not found -> ' + visAniNode)
 
 
 def mExportGeoCache(geoCacheDir, assetName):
@@ -264,16 +259,22 @@ def mExportGeoCache(geoCacheDir, assetName):
 	mel.eval(evalCmd)
 
 
-def mImportGeoCache(xmlFile, assetNS, anim_trans):
+def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList):
 	"""
 	"""
 	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1)
-	anim_trans = [target for target in targetList if target.startswith('|' + assetNS) and not 'LP_geo_grp' in target][0]
-	cmds.select(anim_trans, r= 1);logger.debug(anim_trans)
-	mel.eval('source doImportCacheArgList')
-	mel.eval('if(catch(`deleteCacheFile 3 { "keep", "", "geometry" }`)){warning "// moGeoCache: No caches.";}')
-	#mel.eval('if(catch(`deleteCacheFile 3 {"keep", "", "geometry"}`)){python "logger.warning(\"No caches Del.\")";}')
-	mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+	inverseResult = [T for T in targetList for C in conflictList if not T.startswith('|' + assetNS) or C in T]
+	anim_transList = list(set(targetList) - set(inverseResult))
+	if len(anim_transList) == 1:
+		cmds.select(anim_transList[0], r= 1)
+		mel.eval('source doImportCacheArgList')
+		mel.eval('if(catch(`deleteCacheFile 3 {"keep","","geometry"}`)){python"logger.warning(\\"No caches Del.\\")";}')
+		mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+	elif len(anim_transList) > 1:
+		logger.warning('Conflict, too many target -> ' + anim_trans)
+		logger.warning(anim_transList)
+	else:
+		logger.warning('No target found -> ' + anim_trans)
 
 
 def mExportTimeInfo(timeInfoFile, timeUnit, playbackRange):
@@ -290,8 +291,16 @@ def mImportTimeInfo(timeInfoFile):
 	with open(timeInfoFile, 'r') as timeInfoTxt:
 		timeInfo = timeInfoTxt.read().split('\n')
 		cmds.currentUnit(t= timeInfo[0])
-		cmds.playbackOptions(q= 1, min= float(timeInfo[1].split(':')[0]))
-		cmds.playbackOptions(q= 1, max= float(timeInfo[1].split(':')[1]))
+		logger.info('TimeInfo   [Unit] ' + timeInfo[0])
+		cmds.playbackOptions(min= float(timeInfo[1].split(':')[0]))
+		cmds.playbackOptions(max= float(timeInfo[1].split(':')[1]))
+		logger.info('TimeInfo  [Range] ' + timeInfo[1])
+
+
+def mGetGeoCacheConflictList():
+	"""
+	"""
+	return ['LP_geo_grp']
 
 
 def mGetSmoothExcludeList():
