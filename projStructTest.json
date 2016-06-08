@@ -1,0 +1,75 @@
+{
+  "1ASSETS+": {
+    "1char+": {
+      "charA-": {
+        "1MOD": "masterPath",
+        "2RIG": "masterPath",
+        "3SHD": "masterPath",
+        "4XGN": {
+          "1holder": "asciiPath",
+          "2shader": "asciiPath",
+          "3xgen": "xgenPath"
+        }
+      }
+    },
+    "2prop+": {
+      "propA-": {
+        "1MOD": "masterPath",
+        "2SHD": "masterPath"
+      }
+    },
+    "3set+": {
+      "setA-": {
+        "settled": "masterPath",
+        "unfixed": "masterPath"
+      }
+    }
+  },
+  "2SHOTS+": {
+    "shot1+": {
+      "1info-": {
+        "1ma": "asciiPath",
+        "2abc": "alembicPath"
+      },
+      "2char+": {
+        "charA-": {
+          "1ANI": {
+            "cache": "cachePath",
+            "scene": "scenePath"
+          },
+          "2SIM": {
+            "cache": "cachePath",
+            "scene": "scenePath"
+          },
+          "3HIR": {
+            "cache": "alembicPath",
+            "scene": "scenePath"
+          }
+        },
+        "charB-": {
+          "1ANI": {
+            "cache": "cachePath",
+            "scene": "scenePath"
+          },
+          "2SIM": {
+            "cache": "cachePath",
+            "scene": "scenePath"
+          }
+        }
+      },
+      "3fx+": {
+        "fxA-": {
+          "cache": "path",
+          "scene": "path"
+        },
+        "fxB-": {
+          "cache": "path",
+          "scene": "path"
+        }
+      },
+      "4set+": {
+        "setA-": "settledPath"
+      }
+    }
+  }
+}

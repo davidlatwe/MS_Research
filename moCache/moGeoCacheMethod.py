@@ -9,8 +9,9 @@ logger = logging.getLogger('MayaOil.moGeocache.Method')
 
 import maya.cmds as cmds
 import maya.mel as mel
-import mMaya.mOutliner as mOutliner
-import mMaya.mGeneral as mGeneral
+import mMaya.mOutliner as mOutliner; reload(mOutliner)
+import mMaya.mGeneral as mGeneral; reload(mGeneral)
+import os
 
 
 def mCleanWorkingNS(workingNS):
@@ -39,6 +40,21 @@ def mProcQueue():
 	return expList
 
 
+def mPartialQueue(partial_Dict):
+	"""
+	"""
+	selection = cmds.ls(sl= 1, l= 1)
+	for rootNode in partial_Dict.keys():
+		for dag in selection:
+			if dag.startswith('|' + rootNode):
+				partial_Dict[rootNode].append(dag.split('|')[-1].split(':')[-1])
+				dagShape = cmds.listRelatives(dag, s= 1, ni= 1)
+				if dagShape:
+					partial_Dict[rootNode].append(dagShape[0].split(':')[-1])
+
+	return partial_Dict
+
+
 def mFilterOut(rootNode):
 	"""
 	過濾不必要的物件
@@ -59,32 +75,58 @@ def mFilterOut(rootNode):
 	anim_meshes = _set(cmds.listRelatives(rootNode, ad= 1, f= 1, typ= 'mesh')) - itrm_meshes
 
 	''' # FILTER OUT # <constant hidden objects> '''
+	anim_dags = list(anim_meshes)
+	for mesh in anim_meshes:
+		anim_dags.append(cmds.listRelatives(mesh, p= 1, f= 1)[0])
+	
 	for obj in cmds.listRelatives(rootNode, ad= 1, f= 1):
 		objShouldRemove = False
 		if cmds.attributeQuery('visibility', ex= 1, node = obj):
 			# check if visibility has being connected to something like animCurve, expression or drivenKey
 			if not cmds.listConnections(obj + '.v'):
 				if not cmds.getAttr(obj + '.v'):
+					# constant hidden objects
 					objShouldRemove = True
+					logger.debug('No visibility key -x [' + obj.split('|')[-1] + ']')
 			else:
 				# do something if has key, expression or drivenKey connected to visibility
 				drivers = cmds.setDrivenKeyframe(obj + '.v', q= 1, dr= 1)
 				if drivers[0] == 'No drivers.':
 					# has key or expression
-					anim_viskey.append(obj)
+					doAppend = False
+					if cmds.objectType(obj) == 'transform' and cmds.listRelatives(obj, s= 1):
+						if cmds.objectType(cmds.listRelatives(obj, s= 1)[0]) == 'mesh':
+							doAppend = True
+					if cmds.objectType(obj) == 'mesh':
+						doAppend = True
+					if doAppend:
+						anim_viskey.append(obj)
+						logger.warning('Visibility key detected -> [' + obj.split('|')[-1] + ']')
+					else:
+						logger.debug('Visibility key NOT in mesh -> [' + obj.split('|')[-1] + ']')
 				else:
 					# is a driven obj
 					driverHasAni = 0
 					for driver in drivers:
 						if cmds.listConnections(driver, s= 1, d= 0):
 							# one of drivers has key or expression
-							anim_viskey.append(obj)
-							driverHasAni = 1
-							break
+							doAppend = False
+							if cmds.objectType(obj) == 'transform' and cmds.listRelatives(obj, s= 1):
+								if cmds.objectType(cmds.listRelatives(obj, s= 1)[0]) == 'mesh':
+									doAppend = True
+							if cmds.objectType(obj) == 'mesh':
+								doAppend = True
+							if doAppend:
+								anim_viskey.append(obj)
+								driverHasAni = 1
+								logger.warning('Visibility drivenKey detected -> [' + obj.split('|')[-1] + ']')
+								break
 					# driver has no animation, remove obj
 					if not driverHasAni:
 						if not cmds.getAttr(obj + '.v'):
+							# constant hidden objects
 							objShouldRemove = True
+							logger.debug('No visibility drivenKey -x [' + obj.split('|')[-1] + ']')
 
 			if objShouldRemove:
 				# no visibility animation, check if transform obj has mesh or other child
@@ -143,38 +185,48 @@ def mPolyUniteMesh(anim_meshes):
 	return ves_grp
 
 
-def mSmoothMesh(ves_grp, excludeList):
+def mSmoothMesh(ves, subdivLevel):
 	"""
 	"""
-	for ves in cmds.listRelatives(ves_grp, c= 1):
-		if ves.split(':')[-1] not in excludeList:
-			cmds.polySmooth(ves, mth= 0, sdt= 2, ovb= 1, ofb= 3, ofc= 0, ost= 1,
-									ocr= 0, dv= 1, bnr= 1 ,c= 1, kb= 1, ksb= 1,
-									khe= 0, kt= 1, kmb= 1, suv= 1, peh= 0, sl= 1,
-									dpe= 1, ps= 0.1, ro= 1, ch= 0)
+	cmds.polySmooth(ves, mth= 0, sdt= 2, ovb= 1, ofb= 3, ofc= 0, ost= 1,
+							ocr= 0, dv= subdivLevel, bnr= 1 ,c= 1, kb= 1, ksb= 1,
+							khe= 0, kt= 1, kmb= 1, suv= 1, peh= 0, sl= 1,
+							dpe= 1, ps= 0.1, ro= 1, ch= 0)
 
 
-def mSaveGeoList(ves_grp, geoListFile):
+def mSaveGeoList(geoListFile):
 	"""
 	"""
-	with open(geoListFile, 'w') as geoTxt:
-		for ves in cmds.listRelatives(ves_grp, c= 1):
-			vesShape = cmds.listRelatives(ves, s= 1)[0]
-			geoTxt.write(ves.split(':')[-1] + '@' + vesShape.split(':')[-1] + '\n')
+	with open(geoListFile, 'w') as geomoTxt:
+		pass
 
 
-def mLoadGeoList(geoListFile, rootNode):
+def mLoadGeoList(geoCacheDir, workingNS, geoFileType):
 	"""
 	"""
-	anim_geoList = {}
+	anim_geoDict = {}
 
-	with open(geoListFile, 'r') as geoTxt:
-		for geo in geoTxt:
-			geo_trans = geo.strip().split('@')[0]
-			geo_shape = geo.strip().split('@')[1]
-			anim_geoList[geo_trans] = geo_shape
+	workingNS = workingNS.split(':')[-1]
+	logger.debug(geoCacheDir)
+	for geoFile in os.listdir(geoCacheDir):
+		if geoFile.endswith(geoFileType):
+			geo = geoFile.split(workingNS + '_')[-1].split(geoFileType)[0]
+			geo_trans = geo.split('@')[1]
+			geo_shape = geo.split('@')[0]
+			anim_geoDict[geo_trans] = geo_shape
 
-	return anim_geoList
+	return anim_geoDict
+
+def mLoadVisKeyList(geoCacheDir, mayaFileType):
+	"""
+	"""
+	visAniNodeList = []
+	for mayaFile in os.listdir(geoCacheDir):
+		if mayaFile.endswith(mayaFileType):
+			visAniNode = mayaFile.split('@')[1].split(mayaFileType)[0]
+			visAniNodeList.append(visAniNode)
+
+	return visAniNodeList
 
 
 def mExportViskey(keyFile):
@@ -184,18 +236,35 @@ def mExportViskey(keyFile):
 	cmds.file(keyFile, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
 
 
-def mImportViskey(keyFile, assetNS, viskeyNS):
+def mImportViskey(keyFile, assetNS, visAniNode):
 	"""
 	"""
-	cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, mnr= 1)
-	visAniNodeList = cmds.namespaceInfo(viskeyNS, lod= 1)
-	for visAniNode in visAniNodeList:
-		try:
-			targetList = cmds.ls('*' + visAniNode.split(':')[1], r= 1, l= 1)
-			visAniMesh = [target for target in targetList if target.startswith(assetNS)][0]
-			cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
-		except:
-			logger.warning('viskey target not found -> ' + visAniNode)
+	visAniMesh = ''
+	targetList = cmds.ls('*' + visAniNode.split(':')[-1], r= 1, l= 1)
+	
+	try:
+		visAniMesh = [target for target in targetList if target.startswith('|' + assetNS)][0]
+	except:
+		logger.warning('viskey target not found [' + visAniNode + '] -x')
+		return
+
+	if cmds.objectType(visAniMesh) == 'mesh' and cmds.getAttr(visAniMesh + '.intermediateObject'):
+		visAniMesh = cmds.listRelatives(cmds.listRelatives(visAniMesh, p= 1)[0], s= 1, ni= 1, f= 1)[0]
+	
+	try:
+		inputAni = cmds.listConnections(visAniMesh + '.visibility', p= 1, t= 'animCurve')
+		if inputAni:
+			try:
+				cmds.disconnectAttr(inputAni[0], visAniMesh + '.visibility')
+				cmds.delete(inputAni[0].split('.')[0])
+				logger.warning('viskey PARTIAL deleted. [' + inputAni[0] + ']')
+			except:
+				logger.warning('viskey PARTIAL delete failed. [' + inputAni[0] + ']')
+		cmds.file(keyFile, i= 1, typ= 'mayaAscii', iv= 1, mnc= 1, ns= ':')
+		cmds.connectAttr(visAniNode + '.output', visAniMesh + '.visibility')
+		logger.info('viskey target connected. [' + visAniNode + '] -> {' + visAniMesh + '}')
+	except:
+		logger.warning('viskey target connection failed. [' + visAniNode + '] -x {' + visAniMesh + '}')
 
 
 def mExportGeoCache(geoCacheDir, assetName):
@@ -255,24 +324,45 @@ def mExportGeoCache(geoCacheDir, assetName):
 	args = [ _qts(_gcArgs()[var]) for var in _gcArgs.__code__.co_varnames ]
 	# make cmd and do GeoCache
 	evalCmd = 'doCreateGeometryCache ' + str(version) + ' {' + ', '.join(args) + '};'
-	logger.debug(evalCmd)
+	logger.debug('GeoCache export CMD : ' + evalCmd)
 	mel.eval(evalCmd)
 
 
-def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList):
+def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateName):
 	"""
 	"""
-	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1)
-	inverseResult = [T for T in targetList for C in conflictList if not T.startswith('|' + assetNS) or C in T]
-	anim_transList = list(set(targetList) - set(inverseResult))
-	if len(anim_transList) == 1:
-		cmds.select(anim_transList[0], r= 1)
+	def importGeoProcess(dag):
+		inputAni = []
+		# check if shape node is hidden by visKey
+		anim_shape = cmds.listRelatives(dag, s= 1, ni= 1, f= 1)[0]
+		if cmds.objectType(anim_shape) != 'mesh':
+			return
+		if not cmds.getAttr(anim_shape + '.v'):
+			inputAni = cmds.listConnections(anim_shape + '.visibility', p= 1, t= 'animCurve')
+			if inputAni:
+				cmds.disconnectAttr(inputAni[0], anim_shape + '.visibility')
+				cmds.setAttr(anim_shape + '.v', 1)
+			else:
+				return
+		cmds.select(dag, r= 1)
 		mel.eval('source doImportCacheArgList')
 		mel.eval('if(catch(`deleteCacheFile 3 {"keep","","geometry"}`)){python"logger.warning(\\"No caches Del.\\")";}')
 		mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+		if inputAni:
+			cmds.connectAttr(inputAni[0], anim_shape + '.visibility')
+
+	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1, et= 'transform')
+	inverseResult = [T for T in targetList for C in conflictList if not T.startswith('|' + assetNS) or C in T]
+	anim_transList = list(set(targetList) - set(inverseResult))
+	if len(anim_transList) == 1:
+		importGeoProcess(anim_transList[0])
 	elif len(anim_transList) > 1:
 		logger.warning('Conflict, too many target -> ' + anim_trans)
-		logger.warning(anim_transList)
+		for trans in anim_transList:
+			logger.warning('-x ' + trans)
+			if ignorDuplicateName:
+				logger.warning('Ignor duplicate names... ')
+				importGeoProcess(trans)
 	else:
 		logger.warning('No target found -> ' + anim_trans)
 
@@ -299,16 +389,19 @@ def mImportTimeInfo(timeInfoFile):
 
 def mGetGeoCacheConflictList():
 	"""
+	from set or from outside text file
 	"""
 	return ['LP_geo_grp']
 
 
 def mGetSmoothExcludeList():
 	"""
+	from set or from outside text file
 	"""
-	return ['R_eye_geo3',
-			'R_eye_geo2',
-			'L_eye_geo3',
-			'L_eye_geo2',
-			'R_arm_cloth_geo4'
-			]
+	excludeList = []
+	sets = cmds.ls('*moGeoCacheSmoothExcludeList', r= 1, typ= 'objectSet')
+	if sets:
+		for obj in cmds.sets(sets[0], q= 1, no= 1):
+			excludeList.append(obj.split(':')[-1])
+	
+	return excludeList

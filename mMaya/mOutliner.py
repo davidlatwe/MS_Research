@@ -56,10 +56,10 @@ def findRoot(nodeType= None):
 			root = obj.split('|')[1]
 			if root not in rootNodes and (cmds.objectType(root) in nodeType or nodeType == []):
 				rootNodes.append(root)
-
-		return rootNodes
 	else:
 		cmds.warning(u'未選取或指定任何物件。')
+
+	return rootNodes
 
 @_useSelection
 def findHidden(node= None):

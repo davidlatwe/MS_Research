@@ -7,7 +7,7 @@ Created on 2016.05.10
 import os
 import maya.cmds as cmds
 import maya.mel as mel
-import mMaya.mGeneral as mGeneral
+import mMaya.mGeneral as mGeneral; reload(mGeneral)
 
 
 class SceneInfo(object):

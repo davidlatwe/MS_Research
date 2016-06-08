@@ -47,3 +47,6 @@ def locatorPPC():
 			# [note 1] end
 	else:
 		cmds.warning('select one or more vertex, edge or face')
+
+
+locatorPPC()
