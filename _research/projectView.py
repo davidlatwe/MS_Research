@@ -1,3 +1,11 @@
+# -*- coding:utf-8 -*-
+'''
+Created on 2016.06.08
+
+@author: davidpower
+
+'''
+
 import json
 from pymel.core import *
 

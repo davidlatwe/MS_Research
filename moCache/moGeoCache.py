@@ -4,17 +4,44 @@ Created on 2016.04.28
 
 @author: davidpower
 '''
-import logging
-logger = logging.getLogger('MayaOil.moGeocache.Main')
-
 import maya.cmds as cmds
 import maya.mel as mel
 import moCache.moGeoCacheRules as moRules; reload(moRules)
 import moCache.moGeoCacheMethod as moMethod; reload(moMethod)
+import logging
+
+logger = logging.getLogger('MayaOil.moGeocache.Main')
 
 
+def _getRootNode(assetName_override= None):
 
-def exportGeoCache(subdivLevel= None, isPartial= None, assetName= None, sceneName= None):
+	rootNode_List = moMethod.mProcQueue()
+	if assetName_override and len(rootNode_List) > 1:
+		rootNode_List = [rootNode_List[0]]
+		logger.warning('AssetName has override, only the first rootNode will be processed.')
+
+	return rootNode_List
+
+
+def getAssetList():
+
+	assetList = []
+	rootNode_List = _getRootNode()
+	for rootNode in rootNode_List:
+		assetName = moRules.rAssetName(moRules.rAssetNS(rootNode))
+		assetList.append(assetName)
+	if not assetList:
+		logger.error('assetList is empty as your soul.')
+
+	return assetList
+
+
+def getGeoCacheDir(assetName, sceneName):
+
+	return moRules.rGeoCacheDir(assetName, sceneName)
+
+
+def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None, sceneName_override= None):
 	"""
 	輸出 geoCache
 	"""
@@ -29,7 +56,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName= None, sceneNam
 	timeUnit = moRules.rFrameRate()
 
 	# get list of items to process
-	rootNode_List = moMethod.mProcQueue()
+	rootNode_List = _getRootNode(assetName_override)
 	partial_Dict = {}.fromkeys(rootNode_List, [])
 
 	# partial mode
@@ -65,10 +92,12 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName= None, sceneNam
 		''' vars
 		'''
 		assetNS = moRules.rAssetNS(rootNode)
-		assetName = moRules.rAssetName(assetNS) if not assetName else assetName
-		geoCacheDir = moRules.rGeoCacheDir(assetName, sceneName)
+		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
+		geoCacheDir = getGeoCacheDir(assetName, sceneName_override)
 		geoFileType = moRules.rGeoFileType()
 		excludeList = moMethod.mGetSmoothExcludeList()
+
+		logger.info('AssetName: [' + assetName + ']')
 
 		# FILTER OUT <intermediate objects> & <constant hidden objects>
 		filterResult = moMethod.mFilterOut(rootNode)
@@ -136,11 +165,12 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName= None, sceneNam
 			logger.info('TimeInfo exported.')
 
 		logger.info('[' + rootNode + '] geoCached.')
+		logger.info(geoCacheDir)
 
 	logger.info('GeoCache export completed.')
 
  
-def importGeoCache(sceneName, isPartial= None, assetName= None, ignorDuplicateName= None):
+def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDuplicateName= None, conflictList= None):
 	"""
 	輸入 geoCache
 	"""
@@ -151,7 +181,7 @@ def importGeoCache(sceneName, isPartial= None, assetName= None, ignorDuplicateNa
 	viskeyNS = moRules.rViskeyNS()
 
 	# get list of items to process
-	rootNode_List = moMethod.mProcQueue()
+	rootNode_List = _getRootNode(assetName_override)
 	partial_Dict = {}.fromkeys(rootNode_List, [])
 
 	# partial mode
@@ -182,10 +212,14 @@ def importGeoCache(sceneName, isPartial= None, assetName= None, ignorDuplicateNa
 		# loop vars
 		workRoot = moRules.rWorkspaceRoot()
 		assetNS = moRules.rAssetNS(rootNode)
-		assetName = moRules.rAssetName(assetNS) if not assetName else assetName
-		geoCacheDir = moRules.rGeoCacheDir(assetName, sceneName)
+		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
+		geoCacheDir = getGeoCacheDir(assetName, sceneName)
 		geoFileType = moRules.rGeoFileType()
-		conflictList = moMethod.mGetGeoCacheConflictList()
+		conflictList = [] if conflictList is None else conflictList
+
+		if not cmds.file(geoCacheDir, q= 1, ex= 1):
+			logger.warning('[' + rootNode + '] geoCacheDir not exists -> ' + geoCacheDir)
+			continue
 
 		# get transform list from motxt file
 		anim_geoDict = moMethod.mLoadGeoList(geoCacheDir, workingNS, geoFileType)

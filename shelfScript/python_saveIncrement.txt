@@ -1,0 +1,11 @@
+import sys
+import logging
+logger = logging.getLogger('MayaOil.moGeocache')
+logger.setLevel(logging.INFO)
+
+#toolPath = 'C:/Users/David/Documents/GitHub/MS_MayaOil'
+toolPath = '//storage-server/LaiTaWei/script/MS_MayaOil'
+if not toolPath in sys.path:
+	sys.path.insert(0, toolPath)
+import moTools.saveIncrement as saveIncrement; reload(saveIncrement)
+saveIncrement.mo_saveIncrement()

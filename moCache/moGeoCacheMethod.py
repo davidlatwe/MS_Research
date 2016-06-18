@@ -4,14 +4,14 @@ Created on 2016.05.12
 
 @author: davidpower
 '''
-import logging
-logger = logging.getLogger('MayaOil.moGeocache.Method')
-
 import maya.cmds as cmds
 import maya.mel as mel
 import mMaya.mOutliner as mOutliner; reload(mOutliner)
 import mMaya.mGeneral as mGeneral; reload(mGeneral)
 import os
+import logging
+
+logger = logging.getLogger('MayaOil.moGeocache.Method')
 
 
 def mCleanWorkingNS(workingNS):
@@ -385,13 +385,6 @@ def mImportTimeInfo(timeInfoFile):
 		cmds.playbackOptions(min= float(timeInfo[1].split(':')[0]))
 		cmds.playbackOptions(max= float(timeInfo[1].split(':')[1]))
 		logger.info('TimeInfo  [Range] ' + timeInfo[1])
-
-
-def mGetGeoCacheConflictList():
-	"""
-	from set or from outside text file
-	"""
-	return ['LP_geo_grp']
 
 
 def mGetSmoothExcludeList():

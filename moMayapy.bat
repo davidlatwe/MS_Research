@@ -1,0 +1,1 @@
+mayapy C:\Users\David\Documents\GitHub\MS_MayaOil\moMainABC.py

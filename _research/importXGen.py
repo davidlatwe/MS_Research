@@ -65,8 +65,8 @@ de = xgg.DescriptionEditor
 de.refresh('Full')
 
 # assign shader
-hairGrp = ['hairA3', 'hairA4', 'hairA5', 'hairA6', 'hairA14']
-browlashGrp = ['assassin1', 'assassin2', 'lash1', 'lash2', 'lash3', 'lashBottom1']
+hairGrp = ['hairA3', 'hairA4', 'hairA5', 'hairA6', 'hairA14', 'assassin1', 'assassin2']
+browlashGrp = ['lash1', 'lash2', 'lash3', 'lashBottom1']
 
 cmds.select(hairGrp, r= 1)
 cmds.hyperShade(a= 'VRayHair_HairRed')
