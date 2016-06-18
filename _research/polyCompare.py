@@ -21,3 +21,22 @@ for id in selectionLs:
 
 for id in len(mesh[0]):
     print id
+
+
+
+
+
+##################################################################
+
+import maya.api.OpenMaya as om2
+
+selectionLs = om2.MGlobal.getActiveSelectionList()
+ 
+# 2 # Get the dag path of the first item in the selection list
+selObj = selectionLs.getDagPath(0)
+
+#___________Query vertex position ___________
+# create a Mesh functionset from our dag object
+mfnObject = om2.MFnMesh(selObj)
+
+print mfnObject.getVertices()
