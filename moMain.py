@@ -29,10 +29,8 @@ ch.setFormatter(formatter)
 
 
 
-
-
-exportGeo = 0
-importGeo = 1
+exportGeo = 1
+importGeo = 0
 smooth = 1
 charInd = 0
 

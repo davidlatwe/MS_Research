@@ -9,6 +9,7 @@ from pymel.core import *
 import moSceneInfo; reload(moSceneInfo)
 import mMaya.mGeneral as mGeneral; reload(mGeneral)
 import logging
+import os
 
 logger = logging.getLogger('MayaOil.moCam.Main')
 
@@ -24,23 +25,24 @@ def rWorkingNS():
 	return ':moCamera'
 
 
-def getShotNum(sname):
+def rCamDir():
 
-	shotNum = sname.split('_')[0][1:]
+	sInfo = _getSceneInfo()
+	camDir = ''
 	try:
-		num = int(shotNum)
-		
-		return shotNum
-
+		camDir = sInfo.dirRule['moCamera']
 	except:
-		logger.error('Invaild shot number.')
+		logger.error('[moCamera] file rule missing.')
+
+	return sInfo.workspaceRoot + sInfo.dirRule['moCamera'] + '/'
+
 
 
 def exportCam(shotNum= None):
 
 	sInfo = _getSceneInfo()
 	sname = system.sceneName()
-	shotNum = getShotNum(sname.namebase) if not shotNum else shotNum
+	shotNum = sInfo.shotNum if not shotNum else shotNum
 	workingNS = rWorkingNS()
 
 	if shotNum:
@@ -56,6 +58,10 @@ def exportCam(shotNum= None):
 			resultCamList = parent(duplicate(sourceCamList, ic= 1), group(em= 1, w= 1, n= 'moCameraGrp'))
 			
 			for i, cam in enumerate(resultCamList):
+				# unlock transform
+				cam.tx.unlock();cam.ty.unlock();cam.tz.unlock()
+				cam.rx.unlock();cam.ry.unlock();cam.rz.unlock()
+				cam.sx.unlock();cam.sy.unlock();cam.sz.unlock()
 				# make constrain
 				constrainNode = parentConstraint(sourceCamList[i], cam)
 				# bake animation
@@ -72,8 +78,11 @@ def exportCam(shotNum= None):
 			logger.info('workingNS content: \n' + '\n'.join([str(d) for d in dags]))
 			namespace(f= 1, rm = workingNS, mnr = 1)
 
-			camExportDir = sInfo.workspaceRoot + sInfo.dirRule['moCamera'] + '/'
+			camExportDir = rCamDir()
 			logger.debug('Camera export folder: ' + camExportDir)
+
+			if not os.path.exists(camExportDir):
+				os.makedirs(camExportDir)
 
 			# export MA
 			maPath = camExportDir + 'shot_' + shotNum + '.ma'
@@ -106,17 +115,19 @@ def exportCam(shotNum= None):
 
 		else:
 			logger.warning('No camera selected.')
+	else:
+		logger.warning('Invaild shot number.')
 
 
 def referenceCam(shotNum= None):
 
 	sInfo = _getSceneInfo()
 	sname = system.sceneName()
-	shotNum = getShotNum(sname.namebase) if not shotNum else shotNum
+	shotNum = sInfo.shotNum if not shotNum else shotNum
 
 	if shotNum:
 		# get path
-		camExportDir = sInfo.workspaceRoot + sInfo.dirRule['moCamera'] + '/'
+		camExportDir = rCamDir()
 		logger.debug('Camera export folder: ' + camExportDir)
 		
 		maPath = camExportDir + 'shot_' + shotNum + '.ma'
@@ -125,3 +136,5 @@ def referenceCam(shotNum= None):
 		# reference
 		system.createReference(maPath, defaultNamespace= 1)
 		logger.info('Camera referenced from -> ' + maPath)
+	else:
+		logger.warning('Invaild shot number.')

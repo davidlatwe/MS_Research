@@ -33,11 +33,11 @@ class SceneInfo(object):
 		# project abbreviation
 		self.prjAbbr = ''
 		# scene file version
-		self.ver = ''
+		self.ver = self.getVerSN(self.sceneSplitExt)
 		# the one who last saved this scene
 		self.artist = ''
-		# cut list
-		self.cutId = []
+		# shot number
+		self.shotNum = self.getShotNum(self.sceneSplitExt)
 		# camera list
 		self.cam = []
 		# palybackRange
@@ -57,6 +57,37 @@ class SceneInfo(object):
 			ruleDict[rule] = cmds.workspace(rule, q= 1, fre= 1)
 
 		return ruleDict
+
+
+	def getVerSN(self, filename):
+
+		if filename:
+			txList = filename.split('_')
+			txList.reverse()
+			for tx in txList:
+				if tx.startswith('v') and tx[1].isdigit():
+					return tx[1:]
+
+			logger.error('Invaild version number.')
+			return ''
+
+
+	def getShotNum(self, filename):
+
+		if filename:
+			shotNum = ''
+			txList = filename.split('_')
+			for tx in txList:
+				if tx.startswith('c') and tx[1].isdigit():
+					shotNum = tx[1:]
+			try:
+				num = int(shotNum)
+				
+				return shotNum
+
+			except:
+				logger.error('Invaild shot number.')
+				return ''
 
 
 	def pathSep(self):

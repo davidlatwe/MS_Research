@@ -17,16 +17,32 @@ import logging
 import json
 import os
 import moCache.moGeoCache as moGeoCache; reload(moGeoCache)
+import moSceneInfo; reload(moSceneInfo)
 import moCam.moCam as moCam; reload(moCam)
 
 logger = logging.getLogger('MayaOil.moGeocache.UI')
 
-tempLog = tempfile.gettempdir() + '\\moGeoCacheUserHistory.json'
-jsonFile = workspace(q= 1, rd= 1) + 'mo_geoCacheLog.json'
 
 
+def _getSceneInfo():
+	"""
+	"""
+	return moSceneInfo.SceneInfo()
 
 
+def getJSONFile():
+
+	return workspace(q= 1, rd= 1) + 'mo_geoCacheLog.json'
+
+
+def getTempLog():
+
+	return tempfile.gettempdir() + '\\moGeoCacheUserHistory.json'
+
+
+def getProjList():
+
+	return tempfile.gettempdir() + '\\myFavoriteProjList.txt'
 
 
 def rgb_hex(rgb, downGrade= None):
@@ -79,17 +95,22 @@ def renewUI(*args):
 
 def readJSON():
 
+	jsonFile = getJSONFile()
+
 	if not os.path.isfile(jsonFile):
 		with open(jsonFile, 'w') as json_file:
 			json.dump({}, json_file)
+	try:
+		with open(jsonFile) as json_file:
 
-	with open(jsonFile) as json_file:
-
-		return json.load(json_file)
+			return json.load(json_file)
+	except:
+		return {}
 
 
 def updateJSON(shotNum, assetList, subTyp, filePath= None):
 
+	jsonFile = getJSONFile()
 	snameObj = system.sceneName()
 	filePath = str(snameObj) if not filePath else (filePath + ';' + str(snameObj.namebase))
 	cDate = str(datetime.now())
@@ -111,12 +132,15 @@ def updateJSON(shotNum, assetList, subTyp, filePath= None):
 
 def setUserHistory(userHistory):
 
+	tempLog = getTempLog()
+
 	with open(tempLog, 'w') as tempLogJson:
 		json.dump(userHistory, tempLogJson, indent=4)
 
 
 def getUserHistory():
 	
+	tempLog = getTempLog()
 	userHistory = {}
 	workRoot = workspace(q= 1, rd= 1)
 
@@ -134,16 +158,6 @@ def getUserHistory():
 	return userHistory
 
 
-def getVerSN(filename):
-
-	txList = filename.split('_')
-	txList.reverse()
-	for tx in txList:
-		if tx.startswith('v') and tx[1].isdigit():
-			return tx[1:]
-	return ''
-
-
 def shortDateFormat(latestDate):
 
 	return '' \
@@ -155,10 +169,10 @@ def shortDateFormat(latestDate):
 def submitANI(*args):
 
 	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-
+	sInfo = _getSceneInfo()
 	sname = system.sceneName().namebase
 	if sname:
-		shotNum = moCam.getShotNum(sname)
+		shotNum = sInfo.shotNum
 		assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
 
 		if assetList and shotNum:
@@ -172,10 +186,10 @@ def submitGEO(*args):
 	isPartial = checkBox('cBox_isPartial', q= 1, v= 1)
 	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
 	sceneName_override = str(textField('textF_sceneName', q= 1, tx= 1))
-
+	sInfo = _getSceneInfo()
 	sname = system.sceneName().namebase
 	if sname:
-		shotNum = moCam.getShotNum(sname)
+		shotNum = sInfo.shotNum
 		assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
 		moGeoCache.exportGeoCache(
 			subdivLevel = subdivLevel if subdivLevel else None,
@@ -192,7 +206,7 @@ def submitGEO(*args):
 def submitCAM(*args):
 
 	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-
+	sInfo = _getSceneInfo()
 	sname = system.sceneName().namebase
 	if sname:
 		print 'hi'
@@ -200,7 +214,7 @@ def submitCAM(*args):
 		print camera
 		assets = [dag for dag in ls(sl= 1) if not (dag.getShape() and dag.getShape().type() == 'camera')]
 		print assets
-		shotNum = moCam.getShotNum(sname)
+		shotNum = sInfo.shotNum
 		select(assets, r= 1)
 		assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
 		select(camera, r= 1)
@@ -234,7 +248,8 @@ def btncmd_GEO(sceneName, *args):
 	ignorDuplicateName = checkBox('cBox_ignorDupl', q= 1, v= 1)
 	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
 	sceneName_override = str(textField('textF_sceneName', q= 1, tx= 1))
-	conflictList = str(textField('textF_filter', q= 1, tx= 1))
+	conflictList = str(textField('textF_filter', q= 1, tx= 1)).split(';')
+	print conflictList
 
 	moGeoCache.importGeoCache(
 		sceneName if not sceneName_override else sceneName_override,
@@ -258,8 +273,111 @@ def intcmd_setMinMax(*args):
 		intFieldGrp('intF_sdLevel', e= 1, v1= 4)
 
 
-def ui_geoCacheIO():# border: 1px solid FireBrick; border-radius: 2px;
+def btncmd_cancleSetProj(*args):
 
+	deleteUI('mo_setProject', lay= True)
+	renewUI()
+
+
+def btncmd_setProject(projPath, *args):
+
+	mel.eval('setProject \"' + projPath + '\"')
+	btncmd_cancleSetProj()
+
+
+def btncmd_addProject(*args):
+
+	projListTxt = getProjList()
+	projPath = textField('mo_addProj', q= 1, tx= 1).replace('\\', '/')
+	
+	if projPath:
+		if not os.path.isfile(projListTxt):
+			with open(projListTxt, 'w') as projList:
+				projList.write(projPath)
+		else:
+			double = False
+			with open(projListTxt, 'r') as projList:
+				for line in projList:
+					if line.strip() == projPath:
+						double = True
+						break
+			if not double:
+				with open(projListTxt, 'a') as projList:
+					projList.write('\n' + projPath)
+
+		ui_setProject()
+
+
+def btncmd_delProject(pbtn, dbtn, *args):
+
+	projListTxt = getProjList()
+	projPath = button(pbtn, q= 1, ann= 1)
+	newProjList = []
+
+	if os.path.isfile(projListTxt):
+		with open(projListTxt, 'r') as projList:
+			for line in projList:
+				if line.strip() != projPath:
+					newProjList.append(line.strip())
+		with open(projListTxt, 'w') as projList:
+			projList.write('\n'.join(newProjList))
+
+	deleteUI(pbtn)
+	deleteUI(dbtn)
+
+
+
+def mkProjListBtn(layout):
+
+	sInfo = _getSceneInfo()
+	projListTxt = getProjList()
+	
+	if os.path.isfile(projListTxt):
+		projListSort = []
+		with open(projListTxt, 'r') as projList:
+			for line in projList:
+				projListSort.append(line.strip())
+		projListSort.sort()
+		for proj in projListSort:
+			if proj:
+				rowLayout(nc= 2, adj= 1, p= layout)
+				btnLabel = proj.split(sInfo.sep)[1]
+				pbtn = button(l= btnLabel, ann= proj, c= partial(btncmd_setProject, proj.strip()), h= 40, w= 315)
+				dp_makePySideUI(pbtn, 'QPushButton {font: 14px bold Arial;}')
+				dbtn = button(l= ' x ', h= 40, w= 30)
+				dp_makePySideUI(dbtn, 'QPushButton {font: 16px bold Arial;}')
+				button(dbtn, e= 1, c= partial(btncmd_delProject, pbtn, dbtn))
+				setParent('..')
+
+
+def ui_setProject(*args):
+
+	windowName = 'mo_setProject'
+
+	if dockControl(windowName, q= 1, ex= 1):
+		deleteUI(windowName, lay= True)
+
+	main_ui = window()
+	main_ly = scrollLayout(p= main_ui)
+	dockControl(windowName, area= 'right', content= main_ui, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 370)
+	
+	columnLayout(adj= 1, rs= 5, p= main_ly)
+	rowLayout(nc= 2, adj= 1)
+	textField('mo_addProj', pht= 'O:/....', h= 23, w= 320)
+	button(l= ' Add ', w= 30, h= 20, c= btncmd_addProject)
+	setParent('..')
+	button(l= ' Cancel ', w= 350, h= 30, c= btncmd_cancleSetProj)
+	separator()
+
+	projListColumn = columnLayout(adj= 1)
+	mkProjListBtn(projListColumn)
+
+	setParent('..')
+
+
+def ui_geoCacheIO():
+
+	sInfo = _getSceneInfo()
 	userHistory = getUserHistory()
 	
 	windowName = 'mo_geoCacheIO'
@@ -273,14 +391,20 @@ def ui_geoCacheIO():# border: 1px solid FireBrick; border-radius: 2px;
 	colorN = [50, 120, 140]
 
 	if dockControl(windowName, q= 1, ex= 1):
-		deleteUI(windowName)
+		deleteUI(windowName, lay= True)
 
 	main_ui = window()
 	main_ly = scrollLayout(p= main_ui)
 	dockControl(windowName, area= 'right', content= main_ui, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 370)
 
 	columnLayout(adj= 1, rs= 5, p= main_ly)
-	text(l= u'好好幹活兒!', al= 'left')
+	rowLayout(nc= 3, adj= 3)
+	button(l= 'Set Project', w= 200, c= ui_setProject)
+	text(l= '')
+	text(l= u'好好幹活兒!', al= 'right')
+	setParent('..')
+	projtext = text(l= sInfo.workspaceRoot.split(sInfo.sep)[1].split('_')[1], al= 'left')
+	dp_makePySideUI(projtext, 'QObject {font: bold 20px; font-family: Arial;}')
 	text(l= '')
 
 	pulltext = text(l= 'PUSH  `submit / output', al= 'left', h= 28)
@@ -455,21 +579,21 @@ def ui_geoCacheIO():# border: 1px solid FireBrick; border-radius: 2px;
 				button(btnA, e= 1, en= 0)
 				dp_makePySideUI(btnA, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 50)))
 			else:
-				ver = getVerSN(sceneName_ANI)
+				ver = sInfo.getVerSN(sceneName_ANI)
 				button(btnA, e= 1, l= btnAN + '_' + ver)
 			# check geoCache
 			if not os.path.exists(geoCacheDir):
 				button(btnB, e= 1, en= 0)
 				dp_makePySideUI(btnB, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 50)))
 			else:
-				ver = getVerSN(sceneName_GEO)
+				ver = sInfo.getVerSN(sceneName_GEO)
 				button(btnB, e= 1, l= 'GEO_' + ver)
 			# check camera
 			if not os.path.exists(filePath_CAM):
 				button(btnC, e= 1, en= 0)
 				dp_makePySideUI(btnC, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 50)))
 			else:
-				ver = getVerSN(sceneName_CAM)
+				ver = sInfo.getVerSN(sceneName_CAM)
 				button(btnC, e= 1, l= 'CAM_' + ver)
 
 			# check update

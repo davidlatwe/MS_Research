@@ -77,7 +77,13 @@ def rGeoCacheDir(assetName, sceneName= None):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-	rootPath = sInfo.workspaceRoot + sInfo.dirRule['moGeoCache']
+	geoDir = ''
+	try:
+		geoDir = sInfo.dirRule['moGeoCache']
+	except:
+		logger.error('[moGeoCache] file rule missing.')
+
+	rootPath = sInfo.workspaceRoot + geoDir
 	isMakeDir = False
 	if sceneName is None:
 		sceneName = sInfo.sceneSplitExt
