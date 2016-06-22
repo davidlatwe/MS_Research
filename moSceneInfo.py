@@ -7,7 +7,10 @@ Created on 2016.05.10
 import os
 import maya.cmds as cmds
 import maya.mel as mel
+import logging
 import mMaya.mGeneral as mGeneral; reload(mGeneral)
+
+logger = logging.getLogger('MayaOil.moSceneInfo')
 
 
 class SceneInfo(object):
