@@ -175,12 +175,11 @@ def updateJSON(subTyp, shotNum= None, assetList= None, filePath= None):
 		if subTyp == 'ANI' and assetList:
 			for ast in assetList:
 				if not ast in gcLog['shots'][shotNum]['GEO'].keys():
+					gcLog['shots'][shotNum]['GEO'][ast] = {}
 					if ast in gcLog['asset'].keys():
-						gcLog['shots'][shotNum]['GEO'][ast] = {}
 						logger.info('[ANI] assigned with [' + ast + ']')
 					else:
-						goUpdate = False
-						logger.info('[ANI] can\'t assigned with [%s], due to this asset is not registered.' % ast)
+						logger.warning('[ANI] assigned with [%s], but this asset is not registered.' % ast)
 
 
 	# update asset
@@ -192,8 +191,19 @@ def updateJSON(subTyp, shotNum= None, assetList= None, filePath= None):
 				gcLog['asset'][ast][subTyp][cDate] = filePath
 		else:
 			goUpdate = False
-			logger.info('[%s] can\'t submit, due to filePath is incorrect. -> %s' % filePath)
+			logger.warning('[%s] can\'t submit, due to filePath is incorrect. -> %s' % filePath)
 
+
+	# remove shot
+	if shotNum and subTyp == 'dSh':
+		if not gcLog['shots'].pop(shotNum, False):
+			logger.debug('KeyError, Might removed by someone else.')
+
+
+	# remove asset in shot
+	if shotNum and assetList and subTyp == 'dAs':
+		if not gcLog['shots'][shotNum]['GEO'].pop(assetList[0], False):
+			logger.debug('KeyError, Might removed by someone else.')
 
 	# write
 	if goUpdate:
@@ -323,8 +333,8 @@ def btncmd_ANI(filePath, *args):
 		system.openFile(filePath)
 	except:
 		decision = confirmDialog(
-			t= 'Wanring',
-			m= 'Unsaved changes.\nContinue open?',
+			t= u'警告',
+			m= u'目前場景有未儲存的變更\n要忽略嗎 ?\n繼續開啟檔案請按 [Yes]',
 			b= ['Yes', 'No'],
 			db= 'Yes',
 			cb= 'No',
@@ -360,12 +370,44 @@ def btncmd_CAM(shotNum, *args):
 
 def btncmd_SHD(filePath, *args):
 
-	system.createReference(filePath, defaultNamespace= 1)
+	if filePath:
+		system.createReference(filePath, defaultNamespace= 1)
 
 
 def btncmd_RIG(filePath, *args):
 
-	pass
+	if filePath:
+		system.createReference(filePath, defaultNamespace= 1)
+
+
+def btncmd_delShot(shotNum, *args):
+
+	decision = confirmDialog(
+		t= u'警告',
+		m= u'此動作無法復原\n你確定要刪除第 %s 卡的 Log ?' % shotNum,
+		b= ['Yes', 'No'],
+		db= 'Yes',
+		cb= 'No',
+		ds= 'No',
+		icn= 'warning'
+		)
+	if decision == 'Yes':
+		updateJSON('dSh', shotNum)
+		
+
+def btncmd_delAsset(shotNum, asset, *args):
+
+	decision = confirmDialog(
+		t= u'警告',
+		m= u'此動作無法復原\n你確定要刪除第 %s 卡 - %s 的 Log ?' % (shotNum, asset),
+		b= ['Yes', 'No'],
+		db= 'Yes',
+		cb= 'No',
+		ds= 'No',
+		icn= 'warning'
+		)
+	if decision == 'Yes':
+		updateJSON('dAs', shotNum, [asset])
 
 
 def intcmd_setMinMax(*args):
@@ -459,9 +501,9 @@ def ui_setProject(*args):
 	if dockControl(windowName, q= 1, ex= 1):
 		deleteUI(windowName, lay= True)
 
-	main_ui = window()
-	main_ly = scrollLayout(p= main_ui)
-	dockControl(windowName, area= 'right', content= main_ui, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 370)
+	main_window = window()
+	main_ly = scrollLayout(p= main_window)
+	dockControl(windowName, area= 'right', content= main_window, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 370)
 	
 	columnLayout(adj= 1, rs= 5, p= main_ly)
 	rowLayout(nc= 2, adj= 1)
@@ -479,9 +521,103 @@ def ui_setProject(*args):
 	setParent('..')
 
 
-def mkAssetListBtn():
+def mkAssetListBtn(windowName):
 
-	pass
+	sInfo = _getSceneInfo()
+	userHistory = getUserHistory()
+	workRoot = workspace(q= 1, rd= 1)
+
+	frameBaseColor = hex_rgb('646464')
+
+	gcLog = readJSON()
+	assetList = gcLog['asset'].keys()
+	assetList.sort()
+
+	for asset in assetList:
+
+		colorA = hex_rgb('505050')
+		
+		# asset frameLayout
+		BGcolor = rgb_nor(frameBaseColor)
+		assetFrameName = frameLayout(l= asset, cll= 1, bgc= BGcolor, w= 345)
+		BGcolor = rgb_hex(frameBaseColor, 10)
+		dp_makePySideUI(assetFrameName, 'QWidget {font: bold; color: #222222; background-color: %s}' % BGcolor)
+
+		# asset ui parent formLayout
+		formName = formLayout()
+
+		# huge shot index
+		titleRow = rowLayout(nc= 2, adj= 1, rat= [2, 'bottom', 4])
+		titleName1 = text(l= asset[0].title(), al= 'right')
+		dp_makePySideUI(titleName1, 'QObject {font: Bold 70px Courier; color: #' + '252525' + ';}')
+		titleName2 = text(l= asset[1].lower(), al= 'right')
+		dp_makePySideUI(titleName2, 'QObject {font: Bold 55px Courier; color: #' + '252525' + ';}')
+		setParent('..')
+
+		# SHD info extract
+		date_SHD = gcLog['asset'][asset]['SHD'].keys() if gcLog['asset'].has_key(asset) else []
+		date_SHD.sort()
+		dateShortSHD = shortDateFormat(date_SHD[-1]) if date_SHD and date_SHD[-1] else ''
+		filePath_SHD = gcLog['asset'][asset]['SHD'][date_SHD[-1]] if dateShortSHD else ''
+		fileName_SHD = os.path.basename(filePath_SHD) if dateShortSHD else ''
+		sceneName_SHD = os.path.splitext(fileName_SHD)[0] if dateShortSHD else ''
+
+		# RIG info extract
+		date_RIG = gcLog['asset'][asset]['RIG'].keys() if gcLog['asset'].has_key(asset) else []
+		date_RIG.sort()
+		dateShortRIG = shortDateFormat(date_RIG[-1]) if date_RIG and date_RIG[-1] else ''
+		filePath_RIG = gcLog['asset'][asset]['RIG'][date_RIG[-1]] if dateShortRIG else ''
+		fileName_RIG = os.path.basename(filePath_RIG) if dateShortRIG else ''
+		sceneName_RIG = os.path.splitext(fileName_RIG)[0] if dateShortRIG else ''
+
+		columName = columnLayout(adj= 1)
+
+		rowLayout(nc= 3, adj= 1)
+		txt_SHD = text(l= dateShortSHD, al= 'center', w= 105)
+		txt_RIG = text(l= dateShortRIG, al= 'center', w= 105)
+		text(l= '', w= 3)
+		setParent('..')
+		
+		rowLayout(nc= 3, adj= 1)
+		btn_SHD = button(l= 'SHD', w= 105, h= 30, ann= fileName_SHD, c= partial(btncmd_SHD, filePath_SHD))
+		btn_RIG = button(l= 'RIG', w= 105, h= 30, ann= fileName_RIG, c= partial(btncmd_RIG, filePath_RIG))
+		dp_makePySideUI(btn_SHD, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		dp_makePySideUI(btn_RIG, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		text(l= '', w= 3)
+		setParent('..')
+
+		setParent('..')
+		setParent('..')
+
+		formLayout(formName, e= 1, af=[(titleRow, 'left', 0), (titleRow, 'top', -10)])
+		formLayout(formName, e= 1, af=[(columName, 'right', 0), (columName, 'top', 0), (columName, 'left', 120)])
+		setParent('..')
+
+		colorHide = rgb_hex(colorA, -15)
+		colorGray = rgb_hex(colorA, 0)
+		# check SHD
+		if not os.path.exists(filePath_SHD):
+			button(btn_SHD, e= 1, en= 0)
+			dp_makePySideUI(btn_SHD, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		else:
+			ver = sInfo.getVerSN(sceneName_SHD)
+			button(btn_SHD, e= 1, l= 'SHD' + (('_' + ver) if ver else ''))
+		# check RIG
+		if not os.path.exists(filePath_RIG):
+			button(btn_RIG, e= 1, en= 0)
+			dp_makePySideUI(btn_RIG, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		else:
+			ver = sInfo.getVerSN(sceneName_RIG)
+			button(btn_RIG, e= 1, l= 'RIG' + (('_' + ver) if ver else ''))
+
+
+		# check update
+		if date_SHD and date_SHD[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_SHD, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_SHD, 'QPushButton {background-color: #E3C55E}')
+		if date_RIG and date_RIG[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_RIG, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_RIG, 'QPushButton {background-color: #E3C55E}')
 
 
 def mkShotListBtn(windowName):
@@ -491,8 +627,7 @@ def mkShotListBtn(windowName):
 	workRoot = workspace(q= 1, rd= 1)
 
 	shotPadding = 2
-	color1 = hex_rgb('646464')#[125, 130, 90]
-	color2 = hex_rgb('646464')#[95, 140, 150]
+	frameBaseColor = hex_rgb('646464')
 
 	gcLog = readJSON()
 	shotList = gcLog['shots'].keys()
@@ -502,31 +637,22 @@ def mkShotListBtn(windowName):
 		
 		shotNum = shot[:shotPadding]
 
-		colorA = hex_rgb('505050')		
+		colorA = hex_rgb('505050')
 
 		# shot frameLayout
-		shotFrameName = windowName + '_frameLY_' + shot
-		BGcolor = rgb_nor(color1) if int(shotNum) % 2 else rgb_nor(color2)
-		frameLayout(shotFrameName, l= 'shot ' + shot, cll= 1, bgc= BGcolor)
-		BGcolor = rgb_hex(color1, 10) if int(shotNum) % 2 else rgb_hex(color2, 10)
+		BGcolor = rgb_nor(frameBaseColor)
+		shotFrameName = frameLayout(l= 'shot ' + shot, cll= 1, bgc= BGcolor, w= 345)
+		BGcolor = rgb_hex(frameBaseColor, 10)
 		dp_makePySideUI(shotFrameName, 'QWidget {font: bold; color: #222222; background-color: %s}' % BGcolor)
 
 		# shot ui parent formLayout
-		formName = windowName + '_formLY_' + shot
-		formLayout(formName)
+		formName = formLayout()
 
 		# huge shot index
-		titleName = windowName + '_shotTitle_' + shot
-		text(titleName, l= shotNum, al= 'right')
-		#titleColor = '6B6F4E' if int(shotNum) % 2 else '4E757E'
-		titleColor = '252525'
-		dp_makePySideUI(titleName, 'QObject {font: bold 100px Arial; color: #' + titleColor + ';}')
-
-
-
-		columName = windowName + '_shotColumn_' + shot
-		columnLayout(columName, adj= 1, rs= 5)
-
+		titleName = text(l= shotNum, al= 'right')
+		dp_makePySideUI(titleName, 'QObject {font: bold 100px Arial; color: #' + '252525' + ';}')
+		
+		columName = columnLayout(adj= 1, w= 120)
 
 		# ANI info extract
 		date_ANI = gcLog['shots'][shot]['ANI'].keys()
@@ -548,19 +674,27 @@ def mkShotListBtn(windowName):
 		# shot buttons
 		columnLayout(adj= 1)
 		rowLayout(nc= 2, adj= 1)
-		txt_ANI = windowName + '_text_' + shot + 'ANI'
-		txt_CAM = windowName + '_text_' + shot + 'CAM'
-		text(txt_ANI, l= dateShortANI, al= 'center', w= 75)
-		text(txt_CAM, l= dateShortCAM, al= 'center', w= 75)
+		text(l= '', h= 8, w= 120)
+		delShotBtn = button(l= 'X', h= 14, w= 14, c= partial(btncmd_delShot, shotNum))
+		dp_makePySideUI(delShotBtn, 'QPushButton {background-color: #%s; color: #%s}' % ('624249', '9F9F9F'))
 		setParent('..')
 
-		rowLayout(nc= 2, adj= 1)
+		rowLayout(nc= 3, adj= 1)
+		txt_ANI = windowName + '_text_' + shot + 'ANI'
+		txt_CAM = windowName + '_text_' + shot + 'CAM'
+		text(txt_ANI, l= dateShortANI, al= 'center', w= 98)
+		text(txt_CAM, l= dateShortCAM, al= 'center', w= 97)
+		text(l= '', w= 5)
+		setParent('..')
+
+		rowLayout(nc= 3, adj= 1)
 		btn_ANI = windowName + '_button_' + shot + 'ANI'
 		btn_ANI_label = 'ANI' if not 'layout' in sceneName_ANI else 'LAY'
-		button(btn_ANI, l= btn_ANI_label, w= 155, h= 30, ann= fileName_ANI, c= partial(btncmd_ANI, filePath_ANI))
+		button(btn_ANI, l= btn_ANI_label, w= 98, h= 30, ann= fileName_ANI, c= partial(btncmd_ANI, filePath_ANI))
 
 		btn_CAM = windowName + '_button_' + shot + 'CAM'
-		button(btn_CAM, l= 'CAM', w= 75, h= 30, ann= fileName_CAM, c= partial(btncmd_CAM, shotNum))
+		button(btn_CAM, l= 'CAM', w= 97, h= 30, ann= fileName_CAM, c= partial(btncmd_CAM, shotNum))
+		text(l= '', w= 5)
 		setParent('..')
 		setParent('..')
 
@@ -600,7 +734,7 @@ def mkShotListBtn(windowName):
 		for num, asset in enumerate(shot_assetList):
 
 			# SHD info extract
-			date_SHD = gcLog['asset'][asset]['SHD'].keys()
+			date_SHD = gcLog['asset'][asset]['SHD'].keys() if gcLog['asset'].has_key(asset) else []
 			date_SHD.sort()
 			dateShortSHD = shortDateFormat(date_SHD[-1]) if date_SHD and date_SHD[-1] else ''
 			filePath_SHD = gcLog['asset'][asset]['SHD'][date_SHD[-1]] if dateShortSHD else ''
@@ -608,7 +742,7 @@ def mkShotListBtn(windowName):
 			sceneName_SHD = os.path.splitext(fileName_SHD)[0] if dateShortSHD else ''
 
 			# RIG info extract
-			date_RIG = gcLog['asset'][asset]['RIG'].keys()
+			date_RIG = gcLog['asset'][asset]['RIG'].keys() if gcLog['asset'].has_key(asset) else []
 			date_RIG.sort()
 			dateShortRIG = shortDateFormat(date_RIG[-1]) if date_RIG and date_RIG[-1] else ''
 			filePath_RIG = gcLog['asset'][asset]['RIG'][date_RIG[-1]] if dateShortRIG else ''
@@ -624,18 +758,18 @@ def mkShotListBtn(windowName):
 			sceneName_GEO = os.path.splitext(fileName_GEO)[0] if dateShortGEO else ''
 			geoCacheDir = moGeoCache.getGeoCacheDir(asset, sceneName_GEO) if dateShortGEO else ''
 
-
-			frameLayout(shotFrameName + asset, l= asset, cll= 0, bgc= rgb_nor(hex_rgb('686868')))
-			dp_makePySideUI(shotFrameName + asset, 'QWidget {color: #222222; background-color: #606060}')
+			rowLayout(nc= 2, adj= 1)
+			shotFrameName_asset = frameLayout(l= asset, cll= 0, bgc= rgb_nor(hex_rgb('686868')))
+			dp_makePySideUI(shotFrameName_asset, 'QWidget {color: #222222; background-color: #606060}')
 			columnLayout(adj= 1)
 
 			rowLayout(nc= 3, adj= 1)
 			txt_SHD = windowName + '_text_' + shot + asset + 'SHD'
 			txt_RIG = windowName + '_text_' + shot + asset + 'RIG'
 			txt_GEO = windowName + '_text_' + shot + asset + 'GEO'
-			text(txt_SHD, l= dateShortSHD, al= 'center', w= 75)
-			text(txt_RIG, l= dateShortRIG, al= 'center', w= 75)
-			text(txt_GEO, l= dateShortGEO, al= 'center', w= 75)
+			text(txt_SHD, l= dateShortSHD, al= 'center', w= 65)
+			text(txt_RIG, l= dateShortRIG, al= 'center', w= 65)
+			text(txt_GEO, l= dateShortGEO, al= 'center', w= 65)
 			setParent('..')
 			
 			rowLayout(nc= 3, adj= 1)
@@ -643,14 +777,20 @@ def mkShotListBtn(windowName):
 			btn_RIG = windowName + '_button_' + shot + asset + 'RIG'
 			btn_GEO = windowName + '_button_' + shot + asset + 'GEO'
 
-			button(btn_SHD, l= 'SHD', w= 75, h= 25, ann= fileName_SHD, c= partial(btncmd_SHD, filePath_SHD))
-			button(btn_RIG, l= 'RIG', w= 75, h= 25, ann= fileName_RIG, c= partial(btncmd_RIG, filePath_RIG))
-			button(btn_GEO, l= 'GEO', w= 75, h= 25, ann= fileName_GEO, c= partial(btncmd_GEO, sceneName_GEO))
+			button(btn_SHD, l= 'SHD', w= 65, h= 25, ann= fileName_SHD, c= partial(btncmd_SHD, filePath_SHD))
+			button(btn_RIG, l= 'RIG', w= 65, h= 25, ann= fileName_RIG, c= partial(btncmd_RIG, filePath_RIG))
+			button(btn_GEO, l= 'GEO', w= 65, h= 25, ann= fileName_GEO, c= partial(btncmd_GEO, sceneName_GEO))
 			dp_makePySideUI(btn_SHD, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
 			dp_makePySideUI(btn_RIG, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
 			dp_makePySideUI(btn_GEO, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
 			setParent('..')
 
+			setParent('..')
+			setParent('..')
+			columnLayout(adj= 2)
+			delAssetBtn = button(l= '', w= 5, h= 20, c= partial(btncmd_delAsset, shotNum, asset))
+			text(l= '', w= 5, h= 45)
+			dp_makePySideUI(delAssetBtn, 'QPushButton {background-color: #%s; color: #%s}' % ('624249', '1F1F1F'))
 			setParent('..')
 			setParent('..')
 
@@ -692,7 +832,7 @@ def mkShotListBtn(windowName):
 
 
 		formLayout(formName, e= 1, af=[(titleName, 'left', -20), (titleName, 'top', -25)])
-		formLayout(formName, e= 1, af=[(columName, 'right', 0), (columName, 'top', 0)])
+		formLayout(formName, e= 1, af=[(columName, 'right', 0), (columName, 'top', 0), (columName, 'left', 120)])
 
 		setParent('..')
 		setParent('..')
@@ -707,113 +847,144 @@ def ui_geoCacheIO():
 	sInfo = _getSceneInfo()
 	userHistory = getUserHistory()
 	workRoot = workspace(q= 1, rd= 1)
-
-	if dockControl(windowName, q= 1, ex= 1):
-		deleteUI(windowName, lay= True)
-
-	main_ui = window()
-	main_ly = scrollLayout(p= main_ui)
-	dockControl(windowName, area= 'right', content= main_ui, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 380)
-
-	columnLayout(adj= 1, rs= 5, p= main_ly)
-	rowLayout(nc= 2, adj= 3)
-	btnPrj = button(l= 'Set Project', h= 23, w= 250, bgc= [.25, .25, .25], c= ui_setProject)
-	btnREF = button(l= 'Refresh', h= 23, w= 100, bgc= [.21, .21, .21], c= renewUI)
-	setParent('..')
-	dp_makePySideUI(btnPrj, 'QPushButton {font: 14px Courier; color: #25696B;}')
-	dp_makePySideUI(btnREF, 'QPushButton {font: 14px Courier; color: #407043;}')
-
-	text(l= sInfo.workspaceRoot, al= 'left', en= 0)
-	projtext = text(l= sInfo.workspaceRoot.split(sInfo.sep)[1].split('_')[1], h= 36, al= 'left')
-	dp_makePySideUI(projtext, 'QObject {font: bold 32px; color: #222222; font-family: Arial;}')
-	text(l= '', h= 1)
-
-	pushtext = text(l= 'PUSH  `submit / output', al= 'left', h= 20)
-	dp_makePySideUI(pushtext, 'QObject {font: bold 20px; font-family: Arial; color: #3C3C3C;}')
-
-	separator()
 	ctrBaseColor = [.32, .32, .32]
 	ctrSubsColor = [.22, .22, .22]
 
-	columnLayout(adj= 1, bgc= ctrBaseColor)
-	columnLayout(adj= 1)
-	rowLayout(nc= 2)
-	btnSHD = button(l= 'SHD', h= 30, w= 175, bgc= ctrSubsColor, c= submitSHD)
-	btnRIG = button(l= 'RIG', h= 30, w= 175, bgc= ctrSubsColor, c= submitRIG)
+	if dockControl(windowName, q= 1, ex= 1):
+		deleteUI(windowName)
+
+	main_window = window()
+	
+	mainForm = formLayout(p= main_window)
+	
+	staticArea = columnLayout(adj= 1, rs= 5)
+	if True:
+		rowLayout(nc= 2, adj= 3)
+		if True:
+			btnPrj = button(l= 'Set Project', h= 23, w= 250, bgc= [.25, .25, .25], c= ui_setProject)
+			btnREF = button(l= 'Refresh', h= 23, w= 100, bgc= [.21, .21, .21], c= renewUI)
+			setParent('..')
+	
+
+		text(l= sInfo.workspaceRoot, al= 'left', en= 0)
+		projtext = text(l= sInfo.workspaceRoot.split(sInfo.sep)[1].split('_')[1], h= 36, al= 'left')
+		setParent('..')
+
+
+	paneArea = paneLayout(cn= 'horizontal2', shp= 1, ps= [1, 100, 1])
+	if True:	
+		# PUSH #####
+		columnLayout(adj= 1, rs= 5, p= paneArea)
+		if True:
+			pushtext = text(l= 'PUSH  `submit / output', al= 'left', h= 20)
+			columnLayout(adj= 1, bgc= ctrBaseColor)
+			if True:
+				rowLayout(nc= 2, adj= 1)
+				if True:
+					btnSHD = button(l= 'SHD', h= 30, w= 180, bgc= ctrSubsColor, c= submitSHD)
+					btnRIG = button(l= 'RIG', h= 30, w= 180, bgc= ctrSubsColor, c= submitRIG)
+					setParent('..')
+				rowLayout(nc= 7)
+				if True:
+					tex_com = text(l= 'Common: ', w= 55, al= 'right')
+					text(l= '')
+					tex_pgeo = text(l= 'Partial GEO ', al= 'right', w= 70)
+					checkBox('cBox_isPartial', l= '', w= 13)
+					text(l= '')
+					txt_over1 = text('  *Override ', en= 0)
+					textField('textF_assetName', pht= 'assetName', w= 125)
+					setParent('..')
+				rowLayout(nc= 7)
+				if True:
+					tex_exp = text(l= 'Export: ', w= 55, al= 'right')
+					text(l= '')
+					tex_addD = text(l= 'Add Division ', al= 'right', w= 70)
+					intFieldGrp('intF_sdLevel', l= '', v1= 0, ad2= 1, cw= [2, 14], w= 19, cc= intcmd_setMinMax)
+					text(l= '')
+					txt_over2 = text('*Override ', en= 0)
+					textField('textF_sceneName', pht= 'sceneName', w= 125)
+					setParent('..')
+				rowLayout(nc= 7)
+				if True:
+					tex_imp = text(l= 'Import: ', w= 55, al= 'right')
+					text(l= '')
+					tex_sam = text(l= 'Same Name ', al= 'right', w= 70)
+					checkBox('cBox_ignorDupl', l= '', w= 13)
+					text(l= '')
+					txt_filt = text('  *Filter       ', en= 0)
+					textField('textF_filter', pht= 'string1;string2...', w= 125)
+					setParent('..')
+				rowLayout(nc= 3, adj= 3)
+				if True:
+					btnPushName = windowName + '_button_' + 'submit'
+					button(btnPushName + 'ANI', l= 'ANI', h= 44, w= 120, bgc= ctrSubsColor, c= submitANI)
+					button(btnPushName + 'CAM', l= 'CAM', h= 44, w= 120, bgc= ctrSubsColor, c= submitCAM)
+					button(btnPushName + 'GEO', l= 'GEO', h= 44, w= 120, bgc= ctrSubsColor, c= submitGEO)
+					setParent('..')
+				setParent('..')
+			text(l= '', h= 1)
+			setParent('..')
+
+		# PULL #####
+		pullForm = formLayout(p= paneArea)
+		if True:
+			pulltext = text(l= 'PULL  `open / input', al= 'left', h= 20)
+			pullTab = tabLayout(bs= 'none', scr= 1)
+			if True:
+				shotColumn = columnLayout(rs= 5)
+				if True:
+					mkShotListBtn(windowName)
+					setParent('..')
+				tabLayout(pullTab, e= 1, tabLabel= [shotColumn, '    S H O T S    '])
+
+				assetColumn = columnLayout(rs= 5)
+				if True:
+					mkAssetListBtn(windowName)
+					setParent('..')
+				tabLayout(pullTab, e= 1, tabLabel= [assetColumn, '    A S S E T    '])
+
+				setParent('..')
+
+		formLayout(pullForm, e= 1, af=[(pulltext, 'top', 3)])
+		formLayout(pullForm, e= 1, ac=[(pullTab, 'top', 8, pulltext)])
+		formLayout(pullForm, e= 1, af=[(pullTab, 'bottom', 0), (pullTab, 'right', 0), (pullTab, 'left', 0)])
+
+		logger.info('Last Time Logged in: ' + userHistory[workRoot])
+		userHistory[workRoot] = str(datetime.now())
+		setUserHistory(userHistory)
+
+	formLayout(mainForm, e= 1, af= [(staticArea, 'top', 0)])
+	formLayout(mainForm, e= 1, af= [(paneArea, 'top', 90), (paneArea, 'bottom', 0)])
+
+
+	# pySide
+	dp_makePySideUI(btnPrj, 'QPushButton {font: 14px Courier; color: #25696B;}')
+	dp_makePySideUI(btnREF, 'QPushButton {font: 14px Courier; color: #407043;}')
+	dp_makePySideUI(projtext, 'QObject {font: bold 32px; color: #222222; font-family: Arial;}')
+	dp_makePySideUI(pushtext, 'QObject {font: bold 20px; font-family: Arial; color: #3C3C3C;}')
 	dp_makePySideUI(btnSHD, 'QPushButton {font: 20px Courier; color: #8C7B3D;}')
 	dp_makePySideUI(btnRIG, 'QPushButton {font: 20px Courier; color: #8C7B3D;}')
-	setParent('..')
-	rowLayout(nc= 7)
-	tex_com = text(l= 'Common: ', w= 55, al= 'right')
 	dp_makePySideUI(tex_com, 'QObject {color: #AAAAAA;}')
-	text(l= '')
-	tex_pgeo = text(l= 'Partial GEO ', al= 'right', w= 70)
 	dp_makePySideUI(tex_pgeo, 'QObject {color: #AAAAAA;}')
-	checkBox('cBox_isPartial', l= '', w= 13)
 	dp_makePySideUI('cBox_isPartial', 'QObject {color: #AAAAAA; background-color: #252525;}')
-	text(l= '')
-	txt_over1 = text('  *Override ', en= 0)
 	dp_makePySideUI(txt_over1, 'QObject {color: #AAAAAA;}')
-	textField('textF_assetName', pht= 'assetName', w= 125)
 	dp_makePySideUI('textF_assetName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	setParent('..')
-
-	rowLayout(nc= 7)
-	tex_exp = text(l= 'Export: ', w= 55, al= 'right')
 	dp_makePySideUI(tex_exp, 'QObject {color: #AAAAAA;}')
-	text(l= '')
-	tex_addD = text(l= 'Add Division ', al= 'right', w= 70)
 	dp_makePySideUI(tex_addD, 'QObject {color: #AAAAAA;}')
-	intFieldGrp('intF_sdLevel', l= '', v1= 0, ad2= 1, cw= [2, 14], w= 19, cc= intcmd_setMinMax)
 	dp_makePySideUI('intF_sdLevel', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	text(l= '')
-	txt_over2 = text('*Override ', en= 0)
 	dp_makePySideUI(txt_over2, 'QObject {color: #AAAAAA;}')
-	textField('textF_sceneName', pht= 'sceneName', w= 125)
 	dp_makePySideUI('textF_sceneName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	setParent('..')
-
-	rowLayout(nc= 7)
-	tex_imp = text(l= 'Import: ', w= 55, al= 'right')
 	dp_makePySideUI(tex_imp, 'QObject {color: #AAAAAA;}')
-	text(l= '')
-	tex_sam = text(l= 'Same Name ', al= 'right', w= 70)
 	dp_makePySideUI(tex_sam, 'QObject {color: #AAAAAA;}')
-	checkBox('cBox_ignorDupl', l= '', w= 13)
 	dp_makePySideUI('cBox_ignorDupl', 'QObject {color: #AAAAAA; background-color: #252525;}')
-	text(l= '')
-	txt_filt = text('  *Filter       ', en= 0)
 	dp_makePySideUI(txt_filt, 'QObject {color: #AAAAAA;}')
-	textField('textF_filter', pht= 'string1;string2...', w= 125)
 	dp_makePySideUI('textF_filter', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	setParent('..')
-	setParent('..')
-
-	rowLayout(nc= 3, adj= 1)
-	btnPushName = windowName + '_button_' + 'submit'
-	button(btnPushName + 'ANI', l= 'ANI', h= 44, w= 100, bgc= ctrSubsColor, c= submitANI)
-	button(btnPushName + 'CAM', l= 'CAM', h= 44, w= 100, bgc= ctrSubsColor, c= submitCAM)
-	button(btnPushName + 'GEO', l= 'GEO', h= 44, w= 100, bgc= ctrSubsColor, c= submitGEO)
 	dp_makePySideUI(btnPushName + 'ANI', 'QPushButton {font: 28px Courier; color: #9D344C;}')
 	dp_makePySideUI(btnPushName + 'CAM', 'QPushButton {font: 28px Courier; color: #9D344C;}')
 	dp_makePySideUI(btnPushName + 'GEO', 'QPushButton {font: 28px Courier; color: #AAAAAA;}')
-	setParent('..')
-	setParent('..')
-	
-	separator()
-	text(l= '', h= 1)
-
-	pulltext = text(l= 'PULL  `open / input', al= 'left', h= 20)
 	dp_makePySideUI(pulltext, 'QObject {font: bold 20px; font-family: Arial; color: #3C3C3C;}')
 
-	mkShotListBtn(windowName)
-
-	separator()
-	setParent('..')
-
-	logger.info('Last Time Logged in: ' + userHistory[workRoot])
-	userHistory[workRoot] = str(datetime.now())
-	setUserHistory(userHistory)
+	dockControl(windowName, area= 'right', content= main_window, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 380)
 
 
 if __name__ == '__main__':

@@ -71,7 +71,7 @@ class SceneInfo(object):
 				if tx.startswith('v') and tx[1].isdigit():
 					return tx[1:]
 
-			logger.error('Invaild version number.')
+			logger.error('Invaild version number. filename: %s' % filename)
 			return ''
 
 
