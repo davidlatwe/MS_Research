@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+	ProductType="Application"
+
+	AutodeskProduct="Maya"
+	Name="deeXVRayArsenal"
+	Description="DeeX VRay Arsenal Trial : The ultimate tool for VRay For Maya !"
+	AppVersion="1.2.0"
+	Author="Damien Bataille"
+	AppNameSpace="info.deex.exchange.maya.deexvrayarsenal"
+	HelpFile="./Contents/docs/index.html"
+	OnlineDocumentation="http://arsenal.deex.info/wordpress/documentation/"
+
+	ProductCode="*"
+	UpgradeCode="{67C40596-46AC-44F5-B765-C4809B6CEA74}" >
+	
+	<CompanyDetails Name="DeeX"
+		Phone=" "
+		Url="http://arsenal.deex.info/"
+		Email="arsenal@deex.info" />
+
+	<!-- Prevent to load in other version than Maya 2014 -->
+	<RuntimeRequirements SupportPath="./Contents/docs" OS="win64" Platform="Maya" SeriesMin="2014" SeriesMax="2014" />
+
+	<Components>
+		<RuntimeRequirements SupportPath="./Contents/docs" Platform="Maya" OS="win64" SeriesMin="2014" SeriesMax="2014" />
+		<MayaEnv expr="PATH+:=bin" />
+		<ComponentEntry ModuleName="./Contents/bin/TurboActivate.dat" />
+		<ComponentEntry ModuleName="./Contents/bin/TurboActivate.dll" />
+		<ComponentEntry ModuleName="./Contents/bin/TurboActivate.exe" />
+		<ComponentEntry ModuleName="./Contents/plug-ins/arsenalPass.mll" />
+	</Components>
+	<Components>
+		<RuntimeRequirements SupportPath="./Contents/docs" Platform="Maya" SeriesMin="2014" SeriesMax="2014" />
+		<MayaEnv expr="MAYA_SCRIPT_PATH+:=shelves" />
+		<ComponentEntry ModuleName="./Contents/docs/index.html" />
+		<ComponentEntry ModuleName="./Contents/docs/deeXVRayArsenal.png" />
+		<ComponentEntry ModuleName="./Contents/icons/deeXVRayArsenal.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/presets/deeXVrayFastPresetType_deeX_exterior.txt" />
+		<ComponentEntry ModuleName="./Contents/scripts/presets/deeXVrayFastPresetType_deeX_interior.txt" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/buttonIconBlue.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/buttonIconGreen.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/buttonIconRed.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/buttonIconRose.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/buttonIconYellow.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/generalButton.jpg" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/generalButton.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/pin.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/qualityButtonRound.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/qualityButtonRoundMini.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/images/sliders.png" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/__init__.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/arsenal_multimatteMask_ui.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/ui/arsenal_ui.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/__init__.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenal.cfg" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenal.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenalFunction.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenalQuality.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenalToolBox.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/arsenalUI.pyc" />
+		<ComponentEntry ModuleName="./Contents/scripts/deeXVRayArsenal_load.mel" />
+		<ComponentEntry ModuleName="./Contents/shelves/shelf_DeeXVRayArsenal.mel" />
+	</Components>
+</ApplicationPackage>

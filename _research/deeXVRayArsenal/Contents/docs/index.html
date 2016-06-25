@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/TR/REC-html40" xml:lang="en" dir="ltr" class="js">
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=utf-8">
+<title>DeeX VRay Arsenal: The ultimate tool for VRay For Maya!</title>
+</head>
+
+<style> 
+html, body, div, dl, dt, dd, ul, ol, li, h1, h2, h3, h4, h5, h6, hr, pre, code, form, fieldset, legend, input, textarea, blockquote, table, th, td {
+  padding: 0;
+  margin: 0;
+}
+a{color:#1F5397;text-decoration:none}
+body {font-family:"Arial", "Helvetica", "sans-serif";font-size:12.0px;margin:15px}
+p {font-size:12.0px;line-height:16px;padding:0px;margin:5px 0px 5px 0px}
+ol {font-size:12.0px;line-height:16px;padding:0px;margin:5px 0px 5px 20px}
+h1 {font-size:22.0px;height="26px"}
+.separator-line {border-bottom;border-bottom-width:1px;border-bottom-style:solid;border-bottom-color:#C3C3C3}
+h2 {font-size:16.0px;line-height:18px;height:16px;margin-bottom:3px;margin-top:15px}
+h3 {font-size:14.0px;line-height:16px;height:14px;margin-bottom:3px;margin-top:15px}
+#plugin-icon{float:left;width:94px;height:94px}
+#plugin-name{margin-left:94px}
+#plugin-description{margin-left:94px;margin-top:3px;margin-bottom:40px}
+#navigation{margin-bottom:10px;clear:both}
+.nav-link-spacer {margin:0px 5px 0px 5px}
+.command {margin-top:5px;margin-bottom:3px}
+.command.icon {float:left;width:34px;height:34px}
+.command.name {font-weight:bold;padding-top:4px;margin:0px 0px 0px 34px}
+.command.description {margin:0px 0px 0px 34px}
+.versionset {margin-bottom:5px}
+.version {float:left;width:50px}
+.versioninfo-bullet {margin-left:50px}
+.screenshots {}
+.clearboth {clear:both}
+.thumbnail {float:left; width:207px;margin: 0px 20px 0px 0px}
+.caption { font-weight:bold}
+</style>
+<body>
+<div id="heading">
+	<div id="plugin-icon"><img width="83" height="84" src="../icons/deeXVRayArsenal.png"></div>
+	<div id="plugin-name"><h1 class="separator-line">deeXVRayArsenal</h1></div>
+	<p id="plugin-description">DeeX VRay Arsenal: The ultimate tool for VRay For Maya!</p>
+</div>
+
+<div id="navigation">Getting Started<span class="nav-link-spacer">|</span><a href="#Install">Install/Uninstall</a><span class="nav-link-spacer">|</span><a href="#AdditionalInfo">Additional Information</a><span class="nav-link-spacer">|</span><a href="#Contact">Contact</a><span class="nav-link-spacer">|</span><a class="navigation-link" href="#VersionHistory">Version History</a></p>
+
+<div>
+DeeX VRay Arsenal is a plug-in that allows you to accelerate and facilitate the management of rendering scenes in Maya with VRay.<br />
+The aim being to work faster without technical constraints.<br />
+<br />
+<b>Features:</b><br />
+<blockquote style="padding-left: 15px;">
+    Pass manager<br />
+    Object properties on fly: create black hole, control the primary visibility, reflection, refraction, GI... in one click (nothing is created in your scene, 
+	all is created on the fly during rendering)<br />
+    Matte on fly: create matte mask in one click. Forgot "ID" here, just select your object, simply. Bonus: you can create hierarchical masks ! 
+	(Nothing is created in your scene, all is created on the fly during rendering)<br />
+    On fly render:
+	<ul style="margin-left: 27px;">
+		<li>automatic material ID (work with blend material) (nothing is created in your scene, all is created on the fly during rendering)</li>
+        <li>automatic object ID into proxy (nothing is created in your scene, all is created on the fly during rendering)</li>
+        <li>render you scene with a lambert to check your lighting in one click. Displacement and bump will be kept (nothing is created 
+		in your scene, all is created on the fly during rendering)</li>
+        <li>create "light select renderElement" on fly, manually or automatically (nothing is created in your scene, all is created on the fly during rendering)</li>
+	</ul>
+    Fast control: control your render settings quickly, with GI preset.<br />
+    Quality:
+	<ul style="margin-left: 27px;">
+		<li>control the quality of your render with one slider !</li>
+        <li>set the quality (subdivisions) of your materials automatically in one click (based of the glossiness)</li>
+	</ul>
+    Add offset quality for some part of your render (irradiance map, LC, AA…)<br />
+    ToolBox: many tools to give you an easy life, like:
+    <ul style="margin-left: 27px;">
+        <li>Import multi proxies in one click</li>
+        <li>Connect shader(s) on proxies in one click (with namespace or not)</li>
+        <li>and more...</li>
+	</ul>
+</blockquote>
+</div>
+
+<h2 id="GettingStarted" name="GettingStarted">Getting Started</h2>
+	<div class="command">
+		<div class="command icon"><img width="32" height="32" src="../icons/deeXVRayArsenal.png" alt="Icon" /></div>
+		<div class="command name">DeeX VRay Arsenal</div>
+		<div class="command description"><p>A button has been placed into the Maya 'Custom' shelf to launch the command.</p></div>
+	</div>
+	<div class="command">
+	</div>
+
+<h3>Usage</h3>
+	<p>All documentation is here: <a href="http://arsenal.deex.info/wordpress/documentation/">http://arsenal.deex.info/wordpress/documentation/</a><br />
+	A forum to report problem/wishlist: <a href="http://arsenal.deex.info/wordpress/forums/">http://arsenal.deex.info/wordpress/forums/</a>
+	</p>
+
+<h2 id="Install" name="Install">Installation and Uninstallation</h2>
+	<p>The installer that ran when you downloaded this plug-in from Maya Exchange 
+	has already installed the plug-in. You may need to restart Maya to activate 
+	the plug-in.</p>
+	<p><b>Windows only:</b> To uninstall this plug-in, simply rerun the installer by downloading it again 
+	from Exchange, and select the 'Uninstall' button, or you can uninstall it from 
+	'Control Panel\Programs\Programs and Features' (Windows 7) or Add/Remove 
+	Programs (Windows XP), just as you would uninstall any other application from 
+	your system. The panel on the Plug-ins tab will not be removed until Maya is restarted.</p>
+
+<h3>Available on</h3>
+	<table>
+		<tr><td><img height=48 src="win64.png" /></td></tr>
+		<tr><td align="center">Windows only</td></tr>
+	<table>
+	
+<h2 id="AdditionalInfo" name="AdditionalInfo">Additional Information</h2>
+	<p>This plugin was written by Damien Bataille, alias DeeX, an independent Maya lighting TD and lookDev TD.
+	With a lot of experience on VFX in a lot of companies.</p>
+
+<h3>Known Issues</h3>
+	<p>None.</p>
+
+<h2 id="Contact" name="Contact">Contact</h2>
+	<p>
+	Contact here: <a href="http://arsenal.deex.info/wordpress/contact-new/">http://arsenal.deex.info/wordpress/contact-new/</a><br />
+	Or in the forum: <a href="http://arsenal.deex.info/wordpress/forums/">http://arsenal.deex.info/wordpress/forums/</a>
+	</p>
+	
+<h3>Support Information</h3>
+	<p>If you do encounter issues the please contact DeeX either by email or phone, the details are listed below:<br />
+	<li>Telephone:  </a></li>
+	<li>Email: <a href="mailto:arsenal@deex.info">arsenal@deex.info</a></li>
+	</p>
+
+<h2 id="VersionHistory" name="VersionHistory">Version History</h2>
+	<div class="versionset">
+	<div class="version">1.2.0</div><div class="versioninfo-bullet">
+		<div>Add import/export pass.</div>
+	</div>
+	<div class="version">1.1.0</div><div class="versioninfo-bullet">
+		<div>Modified: remove PyQt and switch to PySide.</div>
+		<div>Feature: fast control: in GI mode, add Brute force + light cache.</div>
+		<div>Feature: optimize material(s): do not set optimized value when something is connected to the “subdivision attribute” of a material.</div>
+		<div>Feature: optimize code for PySide</div>
+	</div>
+	<div class="version">1.0.0</div><div class="versioninfo-bullet">Public release</div>
+	<div class="version">0.6.0</div><div class="versioninfo-bullet">
+		<div>Feature: documentation is online.</div>
+		<div>Feature: now we have tooltips. Add your mouse on a UI of the tool, a tooltip will appear.</div>
+		<div>Feature: VRayMtl lambert from DeeX VRay Arsenal keeps displacement and bump.</div>
+		<div>Feature: Material control: now you can control reflection and refraction separately.</div>
+		<div>Feature: code optimization.</div>
+		<div>Fix bug: point lights now work with “light select” on fly.</div>
+		<div>Fix bug: remove light on “light select” works.</div>
+		<div>Fix bug: “pin windows” works properly. Now DeeX VRay Arsenal is like a “Maya window”.</div>
+	</div>
+	<div class="version">0.52.0</div><div class="versioninfo-bullet">
+		<div>Feature: Add Maya 2011×64 for Windows</div>
+		<div>Feature: ToolBox —> Material ID and Object ID, detect automatically when a “material ID” or “object ID” is locked by the user and do nothing</div>
+		<div>Fix bug: on ToolBox —> Material ID manager</div>
+	</div>
+	<div class="version">0.51.0</div><div class="versioninfo-bullet">Add Maya 2013x64 for Windows</div>
+	<div class="version">0.50.0</div><div class="versioninfo-bullet">Original release</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+// If the module uses a Python script and if are loaded at runtime, Maya does not update the Python path
+// so we need to update it ourself - as Maya may call shelf_DeeXVRayArsenal_load.py right after us
+{
+	string $me =`moduleInfo -p -mn "deeXVRayArsenal"` ;
+	$me +="/scripts" ;
+	python ("import sys") ;
+	string $py[] =python ("sys.path") ;
+	if ( stringArrayCount ($me, $py) == 0 )
+		python ("sys.path.insert(0, '" + $me + "')") ;
+}
+
+// We could eventually copy the shelf_DeeXVRayArsenal.mel code here, but 
+// future version of Maya may load this for us automatically
+shelf_DeeXVRayArsenal;
