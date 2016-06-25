@@ -1,0 +1,325 @@
+proc string WriteJobFilesAndSubmit( string $renderer, int $showDialog, int $regionRendering, int $jobType, string $cameraOverride )
+{
+	global string $DeadlineSubmitterWindow;
+	global string $StartupScriptPathGrp;
+	global int $MayaRenderJobType;
+	global int $MentalRayExportJobType;
+	global int $VRayExportJobType;
+	global int $RendermanExportJobType;
+	global int $ArnoldExportJobType;
+	global int $MaxwellExportJobType;
+	
+	global int $TileRegionRenderType;
+	global int $JigsawRegionRenderType;
+	int $regionType = `optionMenuGrp -q -select frw_regionRenderType`;
+	
+	// Get the deadline temp directory.
+	string $tempDir = CallDeadlineCommand( "-GetCurrentUserHomeDirectory", false ) + "/temp";
+	
+	string $priorityQuery = CallDeadlineCommand( "-getmaximumpriority", false );
+	int $maximumPriority = (int) $priorityQuery;
+	if( $maximumPriority == 0 )
+		$maximumPriority = 100;
+	
+	// Get the output file path and prefix.
+	string $outputFilePath = CheckSlashes( `textFieldGrp -q -text frw_outputFilePath` );
+	$outputFilePath = AddRenderLayerToOutputPathIfNecessary( $renderer, $outputFilePath );
+	
+	string $mentalRayFilename = CheckSlashes( `textFieldGrp -q -text frw_mentalRayFilePath` );
+	string $vrayFilename = CheckSlashes( `textFieldGrp -q -text frw_vrayFilePath` );
+	
+	// Get some initial settings.
+	string $jobName = `textFieldGrp -q -text frw_JobName`;
+	string $frameList = `textFieldGrp -q -text frw_FrameList`;
+	
+	$overrideLayerSettings = `checkBox -q -value frw_overrideLayerSettings`;
+	
+	// Append the render layer name to the job name if the submit each render layer check is on.
+	string $currentRenderLayer = "";
+	int $submitEachRenderLayer = false;
+	if( IsRenderLayersOn() )
+	{
+		$submitEachRenderLayer = `checkBox -q -value frw_submitEachRenderLayer`;
+		
+		if( $jobType == $MayaRenderJobType && $submitEachRenderLayer )
+		{
+			$currentRenderLayer = `editRenderLayerGlobals -query -currentRenderLayer`;
+			
+			if($overrideLayerSettings)
+			{
+				$jobField = "frw_JobName_" + $currentRenderLayer;
+				$jobName = `textFieldGrp -q -text $jobField`;
+			}
+			else
+				$jobName += " - " + $currentRenderLayer;
+			
+			int $range[] = GetFrameRange();
+			int $fromFrame = $range[0];
+			int $toFrame = $range[1];
+			int $byFrame = $range[2];
+			
+			$frameList = $fromFrame + "-" + $toFrame;
+			if( $byFrame > 1 )
+				$frameList = $frameList + "x" + $byFrame;
+		}
+	}
+	
+	// Get region rendering settings.
+	string $regionLeft = 0;
+	string $regionTop = 0; 
+	string $regionRight = 0; 
+	string $regionBottom = 0;
+	int $currX = 0;
+	int $currY = 0;
+	int $currTile = 0;
+	
+	int $tilesInX = `intSliderGrp -q -v frw_tilesInX`;
+	int $tilesInY = `intSliderGrp -q -v frw_tilesInY`;
+	
+	int $singleRegionJob = `checkBox -q -v frw_submitTileSingleJob`;
+	int $singleRegionFrame = `intSliderGrp -q -v frw_tileSingleFrame`;
+	int $singleRegionTiles = 0;
+	string $singleRegionLeft = "";
+	string $singleRegionTop = "";
+	string $singleRegionRight = "";
+	string $singleRegionBottom = "";
+	string $singleRegionPrefix = "";
+	
+	// Append tile information to job name if doing a region render.
+	if( $jobType == $MayaRenderJobType && $regionRendering )
+	{
+		if( !$singleRegionJob )
+		{
+			if( `attributeExists deadlineRegionLeft defaultRenderGlobals` ) $regionLeft = `getAttr defaultRenderGlobals.deadlineRegionLeft`;
+			if( `attributeExists deadlineRegionTop defaultRenderGlobals` ) $regionTop = `getAttr defaultRenderGlobals.deadlineRegionTop`;
+			if( `attributeExists deadlineRegionRight defaultRenderGlobals` ) $regionRight = `getAttr defaultRenderGlobals.deadlineRegionRight`;
+			if( `attributeExists deadlineRegionBottom defaultRenderGlobals` ) $regionBottom = `getAttr defaultRenderGlobals.deadlineRegionBottom`;
+			if( `attributeExists deadlineCurrTile defaultRenderGlobals` ) $currTile = `getAttr defaultRenderGlobals.deadlineCurrTile`;
+			if( `attributeExists deadlineCurrX defaultRenderGlobals` ) $currX = `getAttr defaultRenderGlobals.deadlineCurrX`;
+			if( `attributeExists deadlineCurrY defaultRenderGlobals` ) $currY = `getAttr defaultRenderGlobals.deadlineCurrY`;
+			
+			if($regionType == $TileRegionRenderType)
+				$jobName += " (Tile " + $currTile + " : " + $currX + "x" + $currY + " of " + $tilesInX + "x" + $tilesInY + ")";
+			else
+				$jobName += " (Region " + $currTile + " )";
+		}
+		else
+		{
+			if( `attributeExists deadlineRegionSingleTiles defaultRenderGlobals` ) $singleRegionTiles = `getAttr defaultRenderGlobals.deadlineRegionSingleTiles`;
+			if( `attributeExists deadlineRegionSingleLeft defaultRenderGlobals` ) $singleRegionLeft = `getAttr defaultRenderGlobals.deadlineRegionSingleLeft`;
+			if( `attributeExists deadlineRegionSingleTop defaultRenderGlobals` ) $singleRegionTop = `getAttr defaultRenderGlobals.deadlineRegionSingleTop`;
+			if( `attributeExists deadlineRegionSingleRight defaultRenderGlobals` ) $singleRegionRight = `getAttr defaultRenderGlobals.deadlineRegionSingleRight`;
+			if( `attributeExists deadlineRegionSingleBottom defaultRenderGlobals` ) $singleRegionBottom = `getAttr defaultRenderGlobals.deadlineRegionSingleBottom`;
+			if( `attributeExists deadlineRegionSinglePrefix defaultRenderGlobals` ) $singleRegionPrefix = `getAttr defaultRenderGlobals.deadlineRegionSinglePrefix`;
+			
+			$jobName += " (Frame " + $singleRegionFrame + " - " + $singleRegionTiles + " Tiles)";
+		}
+	}
+	
+	// Figure out the camera to use (if specified).
+	string $camera = "";
+	if( $cameraOverride != "" )
+		$camera = $cameraOverride;
+	else
+	{
+		string $selectedCamera = `optionMenuGrp -q -value frw_camera`;
+		string $cameraNames[] = `listTransforms -cameras`;
+		for( $cameraName in $cameraNames )
+		{
+			if( $cameraName == $selectedCamera )
+			{
+				$camera = $selectedCamera;
+				break;
+			}
+		}
+	}
+	
+	//Check if we need to create a preview job and submit that first
+	
+	int $previewEnabled = `checkBox -q -value frw_renderPreviewJobFirst`;
+	int $previewPriority = `intSliderGrp -q -v frw_PreviewPriority`;
+	int $previewFrames = `intSliderGrp -q -v frw_PreviewFrames`;
+	int $previewDependent = `checkBox -q -value frw_dependent`;
+	int $frameOffset = `intSliderGrp -q -v frw_frameNumberOffset`;
+	int $frameRange[] = GetFramesArray($frameList);
+	int $numFrames = 0;
+	int $gap = 0;
+	int $previewFrameRange[];
+	int $newFrameRange[];
+	string $submitResults = "";
+	
+	if( $regionRendering )
+	{
+		if (!($regionRendering && $submitEachRenderLayer && !$singleRegionJob))
+			$previewEnabled = 0;
+	}
+	
+	if ($previewEnabled == 1)
+	{
+		//We need to make a preview job. The preview job needs to be a dependency of the rest of frames if that is enabled
+		
+		//Some checks to make things are cool
+		$numFrames = size($frameRange);
+		if ($numFrames > $previewFrames)
+		{
+			$gap = $numFrames/$previewFrames;
+			
+			//Build the new frame lists
+			for( $i = 0; $i < $numFrames; $i++ )
+			{
+				if( $i % $previewFrames == 0)
+				{
+					$previewFrameRange[size($previewFrameRange)]=$frameRange[$i];
+				}
+				else
+				{
+					$newFrameRange[size($newFrameRange)]=$frameRange[$i];
+				}
+			}
+			$frameRange=$newFrameRange;
+		}
+		else
+		{
+			print("Preview frame is larger or equal to the number of frames in the Job, does not make any sense to create a preview Job.");
+			$previewEnabled = 0;
+		}
+	}
+	$frameRange = ApplyOutOfOrder($frameRange);
+	$previewFrameRange = ApplyOutOfOrder($previewFrameRange);
+	for($jobNumber = 0; $jobNumber <= $previewEnabled; $jobNumber++)
+	{
+	
+		string $namePostFix = "";
+		//Check if the Job Name needs a special postfix
+		if($previewEnabled == 1)
+		{
+			if($jobNumber == 0)
+				$namePostFix = " [PREVIEW FRAMES]";
+			else
+				$namePostFix = " [REST OF FRAMES]";
+		}
+		
+		string $jobDependencies = `textFieldGrp -q -text frw_dependencies`;
+		//If this is the rest of frames job, check if we need to add the previous job as a dependency
+		if($previewEnabled == 1 && $previewDependent == 1 && $jobNumber == 1)
+		{
+		
+			string $jobId = "";
+			string $resultArray[];
+			$resultArray = stringToStringArray( $submitResults, "\n" );
+			for( $n = 0; $n < size($resultArray); $n++ )
+			{
+				if( startsWith( $resultArray[$n], "JobID=" ) )
+				{
+					$jobId = substituteAllString( $resultArray[$n], "JobID=", "" );
+					break;
+				}
+			}
+		
+			if( size($jobDependencies) == 0)
+				$jobDependencies = $jobId+"";
+			else
+				$jobDependencies = $jobDependencies+","+$jobId;
+		}
+		
+		//Calculate the Priority
+		int $jobPriority = `intSliderGrp -q -v frw_JobPriority`;
+		
+		if ($previewEnabled == 1 && $jobNumber == 0)
+		{
+			$jobPriority = $jobPriority + $previewPriority;
+			
+			if($maximumPriority < $jobPriority)
+				$jobPriority = $maximumPriority;
+			
+		}
+		
+		int $hasREs = 0;
+		string $REs[] = {};
+		string $removableREs[] = {};
+		int $isMultichannelExr = false;
+		string $multichannel = " (multichannel)";
+		string $ext = "";
+	
+		if( $renderer == "vray" )
+		{
+			$REs = `ls -type VRayRenderElement`;
+			if (`optionMenuGrp -exists vrayImageFormatMenu`)
+				$ext = `optionMenuGrp -q -v vrayImageFormatMenu`;
+			else
+				$ext = `getAttr vraySettings.imageFormatStr`;
+				if ($ext == "")
+					$ext = "png";//for some reason this happens if you have not changed the format
+				
+			if( endsWith( $ext, $multichannel ) )
+			{
+				$ext = substring( $ext, 1, size( $ext ) - size( $multichannel ) );
+				$isMultichannelExr = true;
+			}
+			
+			for($RE in $REs)
+			{
+				int $enabled = `getAttr ($RE+".enabled")`;
+				if($enabled == 0)
+				{
+					stringArrayInsertAtIndex( 0, $removableREs, $RE );
+				}
+			}
+			
+			$REs = stringArrayRemove( $removableREs, $REs );
+			if (`size($REs)` > 0)
+			{
+				$hasREs = 1;
+			}
+		}
+		
+		
+		
+		//******************************************************************************************************************************************
+
+		
+		
+		
+		// Submit the job to Deadline
+		string $submissionCommand = "\"" + $submitFilename + "\" \"" + $jobFilename + "\"";
+		if( $submitMayaSceneFile )
+			$submissionCommand += " \"" + $sceneFilePath + "\"";
+		
+		$submitResults = CallDeadlineCommand( $submissionCommand, true );
+	}
+	
+	// Get the job id to return
+	string $jobId = "";
+	string $resultArray[];
+	$resultArray = stringToStringArray( $submitResults, "\n" );
+	for( $n = 0; $n < size($resultArray); $n++ )
+	{
+		if( startsWith( $resultArray[$n], "JobID=" ) )
+		{
+			$jobId = substituteAllString( $resultArray[$n], "JobID=", "" );
+			break;
+		}
+	}
+	
+	// Specify which renderer is being used.
+	if( $jobType == $MentalRayExportJobType )
+		$submitResults = $submitResults + "\n\nUsing renderer: mentalRayExport\n";
+	else if( $jobType == $VRayExportJobType )
+		$submitResults = $submitResults + "\n\nUsing renderer: vrayExport\n";
+	else if( $jobType == $RendermanExportJobType )
+		$submitResults = $submitResults + "\n\nUsing renderer: rendermanExport\n";
+	else if( $jobType == $ArnoldExportJobType )
+		$submitResults = $submitResults + "\n\nUsing renderer: arnoldExport\n";
+	else if( $jobType == $MaxwellExportJobType )
+		$submitResults = $submitResults + "\n\nUsing renderer: maxwellExport\n";  
+	else
+		$submitResults = $submitResults + "\n\nUsing renderer: " + $renderer + "\n";
+	
+	// Show results
+	if( $showDialog )
+		confirmDialog -title "Submission Results" -parent $DeadlineSubmitterWindow -message $submitResults -button "Ok";
+	else
+		print( "\n\nSubmission Results For Job " + $jobName + ":\n---------------------------------------------------------------------------\n" + $submitResults + "\n" );
+	
+	return $jobId;
+}

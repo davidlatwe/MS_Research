@@ -1,0 +1,444 @@
+// Create the job info file.
+string $submitFilename = CheckSlashes( $tempDir + "/maya_deadline_info.job" );
+$fileId = `fopen $submitFilename "w"`;
+if( $fileId == 0 )
+	print( "Error in Deadline Submission Script: could not create " + $submitFilename + "\n" );
+
+int $useMayaBatchPlugin = `checkBox -q -v frw_useMayaBatchPlugin`;
+if( $useMayaBatchPlugin )
+	fprint $fileId ( "Plugin=MayaBatch\n" );
+else
+	fprint $fileId ( "Plugin=MayaCmd\n" );
+
+if( $camera != "" )
+	$jobName = $jobName + " - " + $camera;
+
+fprint $fileId ( "Name=" + $jobName + $namePostFix + "\n" );
+int $submitEachCamera = `checkBox -q -v frw_submitEachCamera`;
+if($submitEachRenderLayer || $submitEachCamera)
+	fprint $fileId ( "BatchName=" + `textFieldGrp -q -text frw_JobName` + "\n" );
+fprint $fileId ( "Comment=" + `textFieldGrp -q -text frw_JobComment` + "\n" );
+fprint $fileId ( "Pool=" + `optionMenuGrp -q -value frw_deadlinePool` + "\n" );
+fprint $fileId ( "SecondaryPool=" + `optionMenuGrp -q -value frw_deadlineSecondaryPool` + "\n" );
+fprint $fileId ( "MachineLimit=" + `intSliderGrp -q -v frw_LimitCount` + "\n" );
+fprint $fileId ( "Priority=" + $jobPriority + "\n" );
+fprint $fileId ( "OnJobComplete=" + `optionMenuGrp -q -value frw_onComplete` + "\n" );
+fprint $fileId ( "TaskTimeoutMinutes=" + `intSliderGrp -q -v frw_SlaveTimeout` + "\n" );
+fprint $fileId ( "MinRenderTimeMinutes=" + `intSliderGrp -q -v frw_MinSlaveTimeout` + "\n" );
+fprint $fileId ( "ConcurrentTasks=" + `intSliderGrp -q -v frw_ConcurrentTasks` + "\n" );
+fprint $fileId ( "Department=" + `textFieldGrp -q -text frw_Department` + "\n" );
+fprint $fileId ( "Group=" + `optionMenuGrp -q -value frw_Group` + "\n" );
+fprint $fileId ( "LimitGroups=" + `textFieldGrp -q -text frw_limitGroups` + "\n" );
+fprint $fileId ( "JobDependencies=" + $jobDependencies + "\n" );
+
+if( `checkBox -q -value frw_isBlacklist` )
+	fprint $fileId ( "Blacklist=" + `textFieldGrp -q -text frw_machineList` + "\n" );
+else
+	fprint $fileId ( "Whitelist=" + `textFieldGrp -q -text frw_machineList` + "\n" );
+
+if( `checkBox -q -value frw_submitAsSuspended` )
+	fprint $fileId ( "InitialStatus=Suspended\n" );
+
+if( $jobType == $MayaRenderJobType )
+{
+	int $counter = 0;
+	string $AOVs[] = { "" };
+	if( $renderer == "arnold" )
+	{
+		int $useArnoldRenderPasses = `getAttr "defaultArnoldRenderOptions.aovMode"`;
+		$AOVs = {};
+		if($useArnoldRenderPasses >0)
+		{
+			string $AOVnames[] = `ls "aiAOV_*"`;
+			for($aovName in $AOVnames)
+			{
+				int $enabled = `getAttr ($aovName+".enabled")`;
+				if($enabled == 1)
+				{
+					stringArrayInsertAtIndex(0,$AOVs,`getAttr ($aovName+".name")`);
+				}
+			}
+		}
+		stringArrayInsertAtIndex(0, $AOVs, "beauty" );
+	}
+	
+	// Store the currently selected render layer
+	string $currentRenderLayer = `editRenderLayerGlobals -query -currentRenderLayer`;
+	string $renderLayerList[] = {""};
+	if( IsRenderLayersOn() && !$submitEachRenderLayer )
+	{
+		$renderLayerList = `ls -exactType "renderLayer"`;
+	}
+	
+	// Loop through the render layer if the checkbox is on
+	for( $i = 0; $i < size( $renderLayerList ); $i++ )
+	{
+		int $isRenderable = 0;
+		if( $renderLayerList[$i] == "")
+		{
+			$isRenderable = 1;
+		}
+		else
+		{
+			// Only get output if this is not a referenced layer
+			int $isReferenceLayer = `referenceQuery -inr $renderLayerList[$i]`;
+			if( !$isReferenceLayer )
+			{
+				// Only get output if the renderable attribute is on
+				int $renderable = `getAttr( $renderLayerList[$i] + ".renderable" )`;
+				if( $renderable )
+				{
+					if( !catch(`editRenderLayerGlobals -currentRenderLayer $renderLayerList[$i]`) )
+					{
+						$isRenderable = 1;
+					}
+				}
+			}
+		}
+		
+		if( $isRenderable )
+		{
+			string $tempOutputFilePath = $outputFilePath;
+			
+			string $cameraNames[] = `listTransforms -cameras`;
+			string $renderableCameras[] = {};
+			if( $camera != "" )
+			{
+				stringArrayInsertAtIndex(0, $renderableCameras, $camera );
+			}
+			else
+			{
+				for( $cameraName in $cameraNames )
+				{
+					if( IsCameraRenderable( $cameraName ) )
+					{
+						stringArrayInsertAtIndex(0, $renderableCameras, $cameraName );
+					}
+				}
+			}
+			
+			for( $cameraName in $renderableCameras )
+			{
+				for($AOV in $AOVs)
+				{
+					string $outputPrefix = "";
+					if( $AOV == "" )
+					{
+						$outputPrefix = CheckSlashes( GetOutputPrefix( 0, 0, $renderLayerList[$i], $cameraName, "" ) );
+					}
+					else
+					{
+						$outputPrefix = CheckSlashes( GetOutputPrefix( 0, 0, $renderLayerList[$i], $cameraName, ("RenderPass="+$AOV) ) );
+					}
+					if( endsWith( $outputPrefix, "deepexr" ) )
+					{
+						string $tempOutputPrefix = substring( $outputPrefix, 1, size( $outputPrefix ) - size( "deepexr" ) );
+						$outputPrefix = $tempOutputPrefix+"exr";
+					}
+					
+					if( $jobType == $MayaRenderJobType && $regionRendering )
+					{
+						if( !$singleRegionJob )
+						{
+							if($regionType ==$TileRegionRenderType)
+								$outputPrefix = GetTileOutputPrefix( $outputPrefix, $currX, $currY, $tilesInX, $tilesInY );
+							else
+								$outputPrefix = GetJigsawOutputPrefix( $outputPrefix, $currTile );
+								
+							fprint $fileId ( "OutputFilename" + $counter + "=" + addCameraOverride(CheckSlashes( $tempOutputFilePath + "/" + $outputPrefix ), $cameraOverride ) + "\n" );
+						}
+						else
+						{
+							if( $AOV == "" )
+							{
+								$outputPrefix = GetOutputPrefix( 1, $singleRegionFrame, $renderLayerList[$i], $cameraName, "" );
+							}
+							else
+							{
+								$outputPrefix = GetOutputPrefix( 1, $singleRegionFrame, $renderLayerList[$i], $cameraName, ("RenderPass="+$AOV) );
+							}
+							if( endsWith( $outputPrefix, "deepexr" ) )
+							{
+								string $tempOutputPrefix = substring( $outputPrefix, 1, size( $outputPrefix ) - size( "deepexr" ) );
+								$outputPrefix = $tempOutputPrefix+"exr";
+							}
+							
+							if($regionType ==$TileRegionRenderType)
+							{
+								int $tileNum = 0;
+								for( $y = 1; $y <= $tilesInY; $y++ )
+								{
+									for( $x = 1; $x <= $tilesInX; $x++ )
+									{
+										string $tempFilePrefix = GetTileOutputPrefix( $outputPrefix, $x, $y, $tilesInX, $tilesInY );
+										fprint $fileId ( "OutputFilename" + $counter + "Tile"+$tileNum+"=" + addCameraOverride(CheckSlashes( $tempOutputFilePath + "/" + $tempFilePrefix ),$cameraOverride) + "\n" );
+										$tileNum++;
+									}
+								}
+							}
+							else
+							{
+								for( $tileNum = 0; $tileNum < $singleRegionTiles; $tileNum++ )
+								{
+									string $tempFilePrefix = GetJigsawOutputPrefix( $outputPrefix, $tileNum );
+									fprint $fileId ( "OutputFilename" + $counter + "Tile"+$tileNum+"=" + addCameraOverride(CheckSlashes( $tempOutputFilePath + "/" + $tempFilePrefix ),$cameraOverride) + "\n" );
+								}
+							}
+						}
+					}
+					else
+					{
+						fprint $fileId ( "OutputFilename" + $counter + "=" + addCameraOverride(CheckSlashes( $tempOutputFilePath + "/" + $outputPrefix ), $cameraOverride ) + "\n" );
+					}
+					
+					$counter++;
+					if( $hasREs && !$isMultichannelExr )
+					{
+						string $base = basenameEx( $outputPrefix );
+						string $folder = substituteAllString($outputPrefix,basename($outputPrefix, ""),"");
+						string $outputExtension = fileExtension($outputPrefix);
+						string $baseNameArray[] = stringToStringArray($base, ".");
+						if( endsWith( $outputExtension, "deepexr" ) )
+						{
+							string $tempOutputExtension = substring( $outputExtension, 1, size( $outputExtension ) - size( "deepexr" ) );
+							$outputExtension = $tempOutputExtension+"exr";
+						}
+						for($RElement in $REs)
+						{
+							int $enabled = `getAttr ($RElement+".enabled")`;
+							if ($enabled == 1)
+							{
+								string $RENameFunction[] = `listAttr -st "vray_name_*" $RElement`;
+								if( `size($RENameFunction)` == 0 )
+								{
+									$RENameFunction = `listAttr -st "vray_filename_*" $RElement`;
+								}
+								
+								string $REName = `getAttr ($RElement+"."+$RENameFunction[0])`;
+							
+								string $REBaseNameArray[] = $baseNameArray;
+								$REBaseNameArray[0] = $REBaseNameArray[0]+(`getAttr "vraySettings.fileNameRenderElementSeparator"`)+$REName;
+								string $REBase = stringArrayToString($REBaseNameArray, ".");
+								string $dateString = `date -format "YYYY_MM_DD_hh_mm_ss"`;
+								string $REOutputPrefix = $REBase+"."+$outputExtension;
+							   
+								string $REoutputFilename = CheckSlashes( $tempOutputFilePath  + "/" + $folder + $REOutputPrefix );
+								fprint $fileId ( "OutputFilename" + $counter + "=" + addCameraOverride($REoutputFilename, $cameraOverride ) + "\n" );
+								$counter++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	// Reselect the current render layer
+	editRenderLayerGlobals -currentRenderLayer $currentRenderLayer;
+	
+}
+else if( $jobType == $MentalRayExportJobType )
+{
+	fprint $fileId ( "OutputDirectory0=" + dirname( $mentalRayFilename ) + "\n" );
+}
+else if( $jobType == $VRayExportJobType )
+{
+	fprint $fileId ( "OutputDirectory0=" + dirname( $vrayFilename ) + "\n" );
+}
+else if( $jobType == $RendermanExportJobType )
+{
+	fprint $fileId ( "OutputDirectory0=" + CheckSlashes( `textFieldGrp -q -text frw_projectPath` + "/renderman/" + GetStrippedSceneFileName() ) + "\n" );
+}
+else if( $jobType == $ArnoldExportJobType || $jobType == $MaxwellExportJobType )
+{
+	fprint $fileId ( "OutputDirectory0=" + CheckSlashes( `textFieldGrp -q -text frw_projectPath` + "/data" ) + "\n" );
+}
+
+$frameList = FromArrayToCommaSeparatedString($frameRange);
+if($jobNumber == 0 && $previewEnabled == 1)
+	$frameList = FromArrayToCommaSeparatedString($previewFrameRange);
+
+if( $jobType == $MayaRenderJobType && $regionRendering && $singleRegionJob )
+{
+	//fprint $fileId ( "Frames=0-" + ($singleRegionTiles-1) + "\n" );
+	//fprint $fileId ( "ChunkSize=1\n" );
+	fprint $fileId ( "TileJob=True\n" );
+	fprint $fileId ( "TileJobFrame=" + $singleRegionFrame + "\n" );
+	
+	if( $regionType == $TileRegionRenderType)
+	{
+		fprint $fileId ( "TileJobTilesInX=" + $tilesInX + "\n" );
+		fprint $fileId ( "TileJobTilesInY=" + $tilesInY + "\n" );
+	}
+	else
+	{
+		fprint $fileId ( "TileJobTilesInX=" + $singleRegionTiles + "\n" );
+		fprint $fileId ( "TileJobTilesInY=1\n" );
+	}
+		
+}
+else
+{	   
+	//TODO, what do I do with this nonsense when submitting a preview job
+	if( $jobType == $MayaRenderJobType && $submitEachRenderLayer )
+	{
+		if($overrideLayerSettings)
+		{
+			$currentRenderLayer = `editRenderLayerGlobals -query -currentRenderLayer`;
+			
+			$field = "frw_FrameList_" + $currentRenderLayer;
+			fprint $fileId ( "Frames=" + `textFieldGrp -q -text $field` + "\n" );
+			
+			$field = "frw_FrameGroup_" + $currentRenderLayer;
+			fprint $fileId ( "ChunkSize=" + `intSliderGrp -q -v $field` + "\n" );
+		}
+		else
+		{
+			fprint $fileId ( "Frames=" + $frameList + "\n" );
+			fprint $fileId ( "ChunkSize=" + `intSliderGrp -q -v frw_FrameGroup` + "\n" );
+		}
+	}
+	else
+	{
+		if( ( $jobType == $ArnoldExportJobType && $regionRendering && $singleRegionJob ) )
+			fprint $fileId ( "Frames=" + $singleRegionFrame + "\n" );
+		else
+			fprint $fileId ( "Frames=" + $frameList + "\n" );
+		
+		// Regular renders and Arnold exports can be split across machines, but other exports (AFAIK) must be done on a single machine.
+		if( $jobType == $MayaRenderJobType || $jobType == $ArnoldExportJobType || $jobType == $MaxwellExportJobType )
+			fprint $fileId ( "ChunkSize=" + `intSliderGrp -q -v frw_FrameGroup` + "\n" );
+		else
+			fprint $fileId ( "ChunkSize=100000\n" );
+	}
+}
+
+if( $jobType == $MayaRenderJobType && $regionRendering && $useMayaBatchPlugin && $renderer == "vray" )
+	fprint $fileId ( "ForceReloadPlugin=True\n" );
+
+$kvpIndex = 0;
+$groupBatch = false;
+int $submitDependentRegionJob = `checkBox -q -v frw_submitTileDependentJob`;
+if( $regionRendering && $submitDependentRegionJob)
+	$groupBatch = true;
+int $submitDependentVRrayJob = `checkBox -q -v frw_submitVRayJob`;
+if($jobType == $VRayExportJobType && $submitDependentVRrayJob)
+	$groupBatch = true;
+int $submitDependentArnold = `checkBox -q -v frw_submitArnoldJob`;
+if($jobType == $ArnoldExportJobType && $submitDependentArnold)
+	$groupBatch = true;
+int $submitDependentMaxwell = `checkBox -q -v frw_submitMaxwellJob`;
+if( $jobType == $MaxwellExportJobType && $submitDependentMaxwell )
+	$groupBatch = true;
+int $submitDepPRMan = `checkBox -q -v frw_submitPRManJob`;
+if($jobType == $RendermanExportJobType && $submitDepPRMan)
+	$groupBatch = true;
+
+//============================================
+//  SHOTGUN / FTRACK
+if( `checkBox -q -v frw_projMgmtCreateVersion` )
+{
+	$selectedIntegration = `optionMenuGrp -q -value frw_projectManagement`;
+
+	if($selectedIntegration == "Shotgun")
+	{
+		global string $SGInfoKeys[];
+		global string $SGInfoValues[];
+		
+		for( $i = 0; $i < size( $SGInfoKeys ); $i++ )
+		{
+			if ( $SGInfoKeys[ $i ] == "TaskName" )
+				fprint $fileId ( "ExtraInfo0=" +  $SGInfoValues[ $i ] + "\n" );
+			else if ( $SGInfoKeys[ $i ] == "ProjectName" )
+				fprint $fileId ( "ExtraInfo1=" +  $SGInfoValues[ $i ] + "\n" );
+			else if ( $SGInfoKeys[ $i ] == "EntityName" )
+				fprint $fileId ( "ExtraInfo2=" +  $SGInfoValues[ $i ] + "\n" );
+			else if ( $SGInfoKeys[ $i ] == "UserName" )
+				fprint $fileId ( "ExtraInfo5=" +  $SGInfoValues[ $i ] + "\n" );
+			else if ( $SGInfoKeys[ $i ] != "DraftTemplate" ) //DON'T put in the Draft template -- if we're doing Draft, let Draft put that stuff in
+			{	
+				fprint $fileId ( "ExtraInfoKeyValue" + $kvpIndex + "=" + $SGInfoKeys[ $i ] + "=" + $SGInfoValues[ $i ] + "\n" );
+				$kvpIndex++;
+			}
+		}
+
+		if( `checkBox -q -value frw_projMgmtCreateMovie` && `checkBox -q -enable frw_projMgmtCreateMovie` )
+		{
+			fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=Draft_CreateSGMovie=True\n");
+			$kvpIndex++;
+
+			$groupBatch = true;
+		}
+
+		if( `checkBox -q -value frw_projMgmtCreateFilmstrip` && `checkBox -q -enable frw_projMgmtCreateFilmstrip` )
+		{
+			fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=Draft_CreateSGFilmstrip=True\n");
+			$kvpIndex++;
+
+			$groupBatch = true;
+		}
+		
+		fprint $fileId ( "ExtraInfo3=" + `textFieldGrp -q -text frw_projMgmtVersion` + "\n" );
+		fprint $fileId ( "ExtraInfo4=" + `textFieldGrp -q -text frw_projMgmtDescription` + "\n" );
+	}
+	else if ( $selectedIntegration == "FTrack" )
+	{
+		global string $FTInfoKeys[];
+		global string $FTInfoValues[];
+
+		for( $i = 0; $i < size( $FTInfoKeys ); $i++ )
+		{
+			if ( $FTInfoKeys[ $i ] == "FT_TaskName" )
+				fprint $fileId ( "ExtraInfo0=" +  $FTInfoValues[ $i ] + "\n" );
+			else if ( $FTInfoKeys[ $i ] == "FT_ProjectName" )
+				fprint $fileId ( "ExtraInfo1=" +  $FTInfoValues[ $i ] + "\n" );
+			else if ( $FTInfoKeys[ $i ] == "FT_AssetName" )
+				fprint $fileId ( "ExtraInfo2=" +  $FTInfoValues[ $i ] + "\n" );
+			else if ( $FTInfoKeys[ $i ] == "FT_Username" )
+				fprint $fileId ( "ExtraInfo5=" +  $FTInfoValues[ $i ] + "\n" );
+			
+			fprint $fileId ( "ExtraInfoKeyValue" + $kvpIndex + "=" + $FTInfoKeys[ $i ] + "=" + $FTInfoValues[ $i ] + "\n" );
+			$kvpIndex++;
+		}
+		
+		fprint $fileId ( "ExtraInfo4=" + `textFieldGrp -q -text frw_projMgmtDescription` + "\n" );
+	}
+}
+//============================================
+
+if( `checkBox -q -v frw_submitDraftJob` )
+{	
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftTemplate=" + `textFieldButtonGrp -q -text frw_DraftTemplate` + "\n");
+	$kvpIndex++;
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftUsername=" + `textFieldGrp -q -text frw_DraftUser` + "\n");
+	$kvpIndex++;
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftEntity=" + `textFieldGrp -q -text frw_DraftEntity` + "\n");
+	$kvpIndex++;
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftVersion=" + `textFieldGrp -q -text frw_DraftVersion` + "\n");
+	$kvpIndex++;
+	
+	int $res[] = GetGlobalsResolution();
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftFrameWidth=" + $res[0] + "\n");
+	$kvpIndex++;
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftFrameHeight=" + $res[1] + "\n");
+	$kvpIndex++;
+	
+	if( `checkBox -q -value frw_uploadDraftToShotgun` && `checkBox -q -enable frw_uploadDraftToShotgun` )
+		fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftUploadToShotgun=True\n");
+	else
+		fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftUploadToShotgun=False\n");
+	$kvpIndex++;
+	
+	fprint $fileId ("ExtraInfoKeyValue" + $kvpIndex + "=DraftExtraArgs=" + `textFieldGrp -q -text frw_DraftExtraArgs` + "\n");
+	$kvpIndex++;
+
+	$groupBatch = true;
+}
+
+if ( $groupBatch )
+{
+	string $batchName = `textFieldGrp -q -text frw_JobName`;
+	//This will group the jobs created later in the same batch
+	fprint $fileId ( "BatchName=" + $batchName + "\n" );
+}
+
+fclose $fileId;

@@ -1,0 +1,46 @@
+#### value is like 4|12. First value (10) is medium value. 30 is the very high value.
+
+####Global option Start####
+vraySettings.globopt_mtl_maxDepth 			= 4.0|12.0
+####Global option End####
+
+####DMC AA Start####
+vraySettings.dmcMaxSubdivs 					= 4.0|10.0
+vraySettings.dmcMinSubdivs 					= 1.0|3.0
+vraySettings.dmcThreshold					= 0.012|0.001
+####DMC AA End####
+
+####Irradiance MAP Start####
+vraySettings.imap_minRate					= -4.0|-3.0
+vraySettings.imap_maxRate					= -1.0|0.0
+vraySettings.imap_colorThreshold				= 0.45|0.183
+vraySettings.imap_normalThreshold			= 0.2|0.1
+vraySettings.imap_distanceThreshold			= 0.05|0.383
+vraySettings.imap_subdivs					= 18.0|12.0
+vraySettings.imap_interpSamples				= 28.0|20.0
+vraySettings.imap_detailRadius				= 12.0|39.0
+vraySettings.imap_detailSubdivsMult			= 0.278|0.372
+####Irradiance MAP End####
+
+####Light cache Start####
+vraySettings.subdivs							= 700.0|1633.0
+vraySettings.sampleSize						= 0.015|0.008
+vraySettings.prefilterSamples				= 32.0|117.0
+vraySettings.filterSamples					= 5.0|12.0
+####Light cache End####
+
+####DMC Sampler start####
+vraySettings.dmcs_adaptiveAmount				= 0.8|0.533
+vraySettings.dmcs_adaptiveThreshold			= 0.005|0.002
+vraySettings.dmcs_adaptiveMinSamples			= 128.0|299.0
+vraySettings.dmcs_subdivsMult				= 2.0|10.0
+####DMC Sampler end####
+
+####Multiplicator start####
+multiplicator|vraySettings.dmcMaxSubdivs	= 1.2
+multiplicator|vraySettings.imap_minRate		= 0.6
+multiplicator|vraySettings.imap_maxRate		= 0.6
+multiplicator|vraySettings.imap_detailRadius	= 1.75
+####Multiplicator end####
+####Info####
+presetComment								=Use this preset for interior scene.\nIf you use GI, set it to Irradiance Map and Light Cache.\nOptional : you can activate the Detail enhancement option in Irradiance Map.\n

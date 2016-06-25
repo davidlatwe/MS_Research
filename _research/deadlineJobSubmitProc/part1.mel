@@ -1,0 +1,25 @@
+global proc DeadlineSubmitterOnOk()
+{
+	global string $DeadlineSubmitterWindow;
+	global int $MayaRenderJobType;
+	
+	// Source a CustomSanityChecks.mel file, if it exists. This file can be used to set some of the defaults
+	// for the properties below if necessary.
+	global string $DeadlineRepositoryRoot;
+	string $sanityScriptPath = CheckSlashes( $DeadlineRepositoryRoot + "/submission/Maya/Main/CustomPostSanityChecks.mel" );
+	if( `file -q -exists $sanityScriptPath` )
+	{
+		
+		print( "sourcing custom post sanity check file: " + $sanityScriptPath + "\n" );
+		eval( "source \"" + $sanityScriptPath + "\";" );
+		if( !CustomPostSanityCheck() )
+			return;
+	}
+	
+	// Check if we are doing a mental ray export
+	int $jobType = `optionMenuGrp -q -select frw_mayaJobType`;
+	if( `checkBox -q -v frw_submitEachRenderLayer` && `checkBox -q -v frw_overrideLayerSettings` && $jobType == $MayaRenderJobType )
+		layoutDialog -parent $DeadlineSubmitterWindow -title "Override Layer Job Settings" -ui "LayerSettingsDialog";
+	else
+		SetupSubmission();
+}

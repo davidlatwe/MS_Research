@@ -1,0 +1,401 @@
+// Create the plugin info file.
+		string $jobFilename = CheckSlashes( $tempDir + "/maya_deadline_job.job" );
+		$fileId = `fopen $jobFilename "w"`;
+		if( $fileId == 0 )
+			print( "Error in Deadline Submission Script: could not create " + $jobFilename + "\n" );
+		
+		// If animation is enabled.
+		fprint $fileId ( "Animation=" + IsAnimatedOn() + "\n" );	
+		
+		if( $jobType == $MentalRayExportJobType )
+		{
+			fprint $fileId ( "Renderer=mentalRayExport\n" );
+			fprint $fileId ( "UsingRenderLayers=false\n" );
+			
+			global string $gExportFilterCheckBoxes[];
+			global string $gExportPathesCheckBoxes[];
+			
+			fprint $fileId ( "MentalRayExportfile=" + $mentalRayFilename + "\n" );
+			fprint $fileId ( "MentalRayExportBinary=" + ((`radioButton -query -select MayatomrExport_Binary`) ? 1 : 0) + "\n" );
+			fprint $fileId ( "MentalRayExportTabStop=" + ($tabstop = `intField -query -value MayatomrExport_TabSize`) + "\n" );
+			
+			int $perframe = 0;
+			int $padframe = 0;
+			if(`checkBoxGrp -query -value1 MayatomrExport_FilePerFrame`)
+			{
+				$perframe = `optionMenuGrp -q -select MayatomrExport_FrameExtension`;
+				$padframe = `intFieldGrp -q -value1 MayatomrExport_FramePadding`;
+				if ($padframe > 9)
+					$padframe = 9;
+			}
+			
+			fprint $fileId ( "MentalRayExportPerFrame=" + $perframe + "\n" );
+			fprint $fileId ( "MentalRayExportPadFrame=" + $padframe + "\n" );
+			fprint $fileId ( "MentalRayExportPerLayer=" + `checkBoxGrp -query -value1 MayatomrExport_FilePerLayer` + "\n" );
+			
+			$pathnames = "";
+			if(`checkBoxGrp -query -value1 MayatomrExport_Pathes`)
+			{
+				for( $cnt=0; $cnt < size( $gExportPathesCheckBoxes ); $cnt++ )
+					$pathnames += `optionMenuGrp -query -sl $gExportPathesCheckBoxes[$cnt]`;
+			}
+			else
+				$pathnames = "n";
+			
+			fprint $fileId ( "MentalRayExportPathNames=" + $pathnames + "\n" );
+			
+			$fragment = (`optionMenuGrp -q -select MayatomrExport_Fragment`-1);
+			fprint $fileId ( "MentalRayExportFragment=" + $fragment + "\n" );
+			fprint $fileId ( "MentalRayExportFragmentMaterials=" + ((`checkBoxGrp -q -v1 MayatomrExport_FragmentMaterials`) ? 1 : 0) + "\n" );
+			fprint $fileId ( "MentalRayExportFragmentShaders=" + ((`checkBoxGrp -q -v1 MayatomrExport_FragmentIncomingShdrs`) ? 1 : 0) + "\n" );
+			fprint $fileId ( "MentalRayExportFragmentChildDag=" + ((`checkBoxGrp -q -v1 MayatomrExport_FragmentChildDag`) ? 1 : 0) + "\n" );
+			fprint $fileId ( "MentalRayExportPassContributionMaps=" + ((`checkBoxGrp -q -v1 MayatomrExport_PassContributionMaps`) ? 1 : 0) + "\n" );
+			fprint $fileId ( "MentalRayExportPassUserData=" + ((`checkBoxGrp -q -v1 MayatomrExport_PassUserData`) ? 1 : 0) + "\n" );
+			
+			$filter = "";
+			if(`checkBoxGrp -query -value1 MayatomrExport_Filters`)
+			{
+				for($cnt=0; $cnt<size($gExportFilterCheckBoxes); $cnt++)
+					$filter += (`checkBoxGrp -query -value1 $gExportFilterCheckBoxes[$cnt]`) ? "0" : "1";
+			}
+			
+			fprint $fileId ( "MentalRayExportFilterString=" + $filter + "\n" );
+		}
+		else if( $jobType == $VRayExportJobType )
+		{
+			fprint $fileId ( "Renderer=vrayExport\n" );
+			fprint $fileId ( "VRayExportFile=" + $vrayFilename + "\n" );
+		}
+		else if( $jobType == $RendermanExportJobType )
+		{
+			fprint $fileId ( "Renderer=rendermanExport\n" );
+			fprint $fileId ( "MaxProcessors=" + `intSliderGrp -q -v frw_exportPRManThreads` + "\n" );
+			fprint $fileId ( "RenderWithRis=" + `checkBox -q -v frw_renderPRManWithRis` + "\n" );
+		}
+		else if( $jobType == $ArnoldExportJobType )
+		{
+			fprint $fileId ( "Renderer=arnoldExport\n" );
+		}
+		else if( $jobType == $MaxwellExportJobType )
+		{
+			fprint $fileId ( "Renderer=maxwellExport\n" );
+			
+			string $outputScript = `textFieldButtonGrp -q -text frw_maxwellScriptName`;
+			if($cameraOverride != "")
+			{
+				string $base = basenameEx( $outputScript );
+				string $folder = substituteAllString($outputScript,basename($outputScript,""),"");
+				string $ext = fileExtension( $outputScript );
+				
+				$outputScript = $folder+$base+"_"+$cameraOverride+"."+$ext;
+			}
+			
+			fprint $fileId ( "MaxwellMXSFile=" + $outputScript + "\n" );
+		}
+		else
+		{
+			fprint $fileId ( "Renderer=" + $renderer + "\n" );
+			fprint $fileId ( "UsingRenderLayers=" + IsRenderLayersOn() + "\n" );
+			fprint $fileId ( "RenderLayer=" + $currentRenderLayer + "\n" );
+			
+			int $renderHalfFrames = ShowHalfFramesOption( $renderer ) ? `checkBox -q -value frw_renderHalfFrames` : 0;
+			fprint $fileId ( "RenderHalfFrames=" + $renderHalfFrames + "\n" );
+			
+			fprint $fileId ( "FrameNumberOffset=" + $frameOffset + "\n" );
+			
+			int $localRendering = `checkBox -q -value frw_localRendering`;
+			fprint $fileId ( "LocalRendering=" + $localRendering + "\n" );
+			
+			int $strictErrorChecking = `checkBox -q -value frw_strictErrorChecking`;
+			fprint $fileId ( "StrictErrorChecking=" + $strictErrorChecking + "\n" );
+			
+			if( $regionRendering )
+			{
+				int $useDraftTileAssembler = `checkBox -q -v frw_submitTileUseDraft`;
+				if($regionType == $JigsawRegionRenderType)
+					$useDraftTileAssembler = 1;
+				fprint $fileId ( "AssembleWithDraft="+$useDraftTileAssembler+"\n" );
+			
+				fprint $fileId ( "RegionRendering=True\n" );
+				if( !$singleRegionJob )
+				{
+					fprint $fileId ( "RegionLeft=" + $regionLeft + "\n" );
+					fprint $fileId ( "RegionTop=" + $regionTop + "\n" );
+					fprint $fileId ( "RegionRight=" + $regionRight + "\n" );
+					fprint $fileId ( "RegionBottom=" + $regionBottom + "\n" );
+				}
+				else
+				{				
+					
+					//fprint $fileId ( "RegionSingleJob=True\n" );
+					//fprint $fileId ( "RegionSingleFrame=" + $singleRegionFrame + "\n" );
+					fprint $fileId ( $singleRegionLeft + "\n" );
+					fprint $fileId ( $singleRegionTop + "\n" );
+					fprint $fileId ( $singleRegionRight + "\n" );
+					fprint $fileId ( $singleRegionBottom + "\n" );
+					fprint $fileId ( $singleRegionPrefix + "\n" );
+				}
+			}
+			
+			if( EnableCpuOption( $renderer ) )
+				fprint $fileId ( "MaxProcessors=" + `intSliderGrp -q -v frw_MaxCPUs` + "\n" );
+			
+			if( $renderer == "mayaSoftware" )
+			{
+				// render globals qualification
+				string $rendQual[] = `listConnections defaultRenderGlobals.qual`;
+				
+				// get antialising quality level and turn it into a string
+				string $strAntialiasing = "highest";
+				int $intAntialiasing = `getAttr ($rendQual[0] + ".edgeAntiAliasing")`;
+				if ( $intAntialiasing == 1 ) $strAntialiasing = "high";
+				if ( $intAntialiasing == 2 ) $strAntialiasing = "medium";
+				if ( $intAntialiasing == 3 ) $strAntialiasing = "low";
+				
+				fprint $fileId ( "AntiAliasing=" + $strAntialiasing + "\n" );
+			}
+			
+			// Krakatoa options currently only supported by the MayaBatch plugin.
+			if( $useMayaBatchPlugin && $renderer == "MayaKrakatoa")
+			{
+				string $boolVal = "";
+				float $krakatoaFinalPassDensity = `getAttr "MayaKrakatoaRenderSettings.finalPassDensity"`;
+				fprint $fileId ( "KrakatoaFinalPassDensity="+ $krakatoaFinalPassDensity + "\n" );
+				
+				int $krakatoaFinalPassDensityExponent = `getAttr "MayaKrakatoaRenderSettings.finalPassDensityExponent"`;
+				fprint $fileId ( "KrakatoaFinalPassDensityExponent=" + $krakatoaFinalPassDensityExponent + "\n" );
+				
+				int $krakatoaUseLightingPassDensity = `getAttr "MayaKrakatoaRenderSettings.useLightingPassDensity"`;
+				
+				
+				if($krakatoaUseLightingPassDensity == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaUseLightingPassDensity=" + $boolVal+ "\n" );
+				
+				float $krakatoaLightingDensity = `getAttr "MayaKrakatoaRenderSettings.lightingPassDensity"`;
+				fprint $fileId ( "KrakatoaLightingPassDensity="+ $krakatoaLightingDensity + "\n" );
+				
+				int $krakatoaLightingDensityExponent = `getAttr "MayaKrakatoaRenderSettings.lightingPassDensityExponent"`;
+				fprint $fileId ( "KrakatoaLightingPassDensityExponent=" + $krakatoaLightingDensityExponent + "\n" );
+				
+				int $krakatoaUseEmissionStrength = `getAttr "MayaKrakatoaRenderSettings.useEmissionStrength"`;
+				if($krakatoaUseEmissionStrength == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaUseEmissionStrength=" + $boolVal + "\n" );
+				
+				float $krakatoaEmissionStrength = `getAttr "MayaKrakatoaRenderSettings.emissionStrength"`;
+				fprint $fileId ( "KrakatoaEmissionStrength="+ $krakatoaEmissionStrength + "\n" );
+
+				int $krakatoaEmissionStrengthExponent = `getAttr "MayaKrakatoaRenderSettings.emissionStrengthExponent"`;
+				fprint $fileId ( "KrakatoaEmissionStrengthExponent=" + $krakatoaEmissionStrengthExponent + "\n" );
+				
+				int $krakatoaUseEmission = `getAttr "MayaKrakatoaRenderSettings.useEmission"`;
+				if($krakatoaUseEmission == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaUseEmission=" + $boolVal + "\n" );
+				
+				int $krakatoaUseAbsorption = `getAttr "MayaKrakatoaRenderSettings.useAbsorption"`;
+				if($krakatoaUseAbsorption == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaUseAbsorption=" + $boolVal + "\n" );
+				
+				int $krakatoaEnableMotionBlur = `getAttr "MayaKrakatoaRenderSettings.enableMotionBlur"`;
+				if($krakatoaEnableMotionBlur == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableMotionBlur=" + $boolVal + "\n" );
+				
+				int $krakatoaMotionBlurParticleSegments = `getAttr "MayaKrakatoaRenderSettings.motionBlurParticleSegments"`;
+				fprint $fileId ( "KrakatoaMotionBlurParticleSegments=" + $krakatoaMotionBlurParticleSegments+ "\n" );
+				
+				int $krakatoaJitteredMotionBlur = `getAttr "MayaKrakatoaRenderSettings.jitteredMotionBlur"`;
+				if($krakatoaJitteredMotionBlur == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaJitteredMotionBlur=" + $boolVal + "\n" );
+				
+				float $krakatoaShutterAngle = `getAttr "MayaKrakatoaRenderSettings.shutterAngle"`;
+				fprint $fileId ( "KrakatoaShutterAngle="+ $krakatoaShutterAngle + "\n" );
+				
+				int $krakatoaEnableDOF = `getAttr "MayaKrakatoaRenderSettings.enableDOF"`;
+				if($krakatoaEnableDOF == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableDOF=" + $boolVal + "\n" );
+				
+				float $krakatoaSampleRateDOF = `getAttr "MayaKrakatoaRenderSettings.sampleRateDOF"`;
+				fprint $fileId ( "KrakatoaSampleRateDOF="+ $krakatoaSampleRateDOF + "\n" );
+				
+				int $krakatoaEnableMatteObjects = `getAttr "MayaKrakatoaRenderSettings.enableMatteObjects"`;
+				if($krakatoaEnableMatteObjects == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableMatteObjects=" + $boolVal + "\n" );
+				
+				int $krakatoaEnableOverrideBG = `getAttr "MayaKrakatoaRenderSettings.overrideBG"`;
+				if($krakatoaEnableOverrideBG == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableOverrideBG=" + $boolVal + "\n" );
+				
+				//float $krakatoaBGOverride[] = `getAttr "MayaKrakatoaRenderSettings.backgroundColor"`;
+				//fprint $fileId ( "KrakatoaBGOverride=" + $krakatoaBGOverride[0]+ " "+ $krakatoaBGOverride[1] + " " + $krakatoaBGOverride[2] + "\n" );
+				
+				int $krakatoaEnableOverrideColor = `getAttr "MayaKrakatoaRenderSettings.overrideColor"`;
+				if($krakatoaEnableOverrideColor == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableOverrideColor=" + $boolVal + "\n" );
+				
+				//float $krakatoaColorOverride[] = `getAttr "MayaKrakatoaRenderSettings.colorChannelOverride"`;
+				//fprint $fileId ( "KrakatoaColorOverride=" + $krakatoaColorOverride[0]+ " "+ $krakatoaColorOverride[1] + " " + $krakatoaColorOverride[2] + "\n" );
+				
+				int $krakatoaEnableOverrideEmission = `getAttr "MayaKrakatoaRenderSettings.overrideEmission"`;
+				if($krakatoaEnableOverrideEmission == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableOverrideEmission=" + $boolVal + "\n" );
+				
+				//float $krakatoaEmissionOverride[] = `getAttr "MayaKrakatoaRenderSettings.emissionChannelOverride"`;
+				//fprint $fileId ( "KrakatoaEmissionOverride=" + $krakatoaEmissionOverride[0]+ " "+ $krakatoaEmissionOverride[1] + " " + $krakatoaEmissionOverride[2] + "\n" );
+				
+				int $krakatoaEnableOverrideAbsorption = `getAttr "MayaKrakatoaRenderSettings.overrideAbsorption"`;
+				if($krakatoaEnableOverrideAbsorption == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaEnableOverrideAbsorption=" + $boolVal+ "\n" );
+				
+				//float $krakatoaAbsorptionOverride[] = `getAttr "MayaKrakatoaRenderSettings.absorptionChannelOverride"`;
+				//fprint $fileId ( "krakatoaAbsorptionOverride=" + $krakatoaAbsorptionOverride[0]+ " "+ $krakatoaAbsorptionOverride[1] + " " + $krakatoaAbsorptionOverride[2] + "\n" );
+				
+				string $krakatoaRenderingMethod = `getAttr -asString "MayaKrakatoaRenderSettings.renderingMethod"`;
+				fprint $fileId ( "KrakatoaRenderingMethod="+ $krakatoaRenderingMethod + "\n" );
+				
+				if ($krakatoaRenderingMethod =="Voxels")
+				{
+					float $krakatoaVoxelSize = `getAttr "MayaKrakatoaRenderSettings.voxelSize"`;
+					fprint $fileId ( "KrakatoaVoxelSize="+ $krakatoaVoxelSize + "\n" );
+					
+					float $krakatoaVoxelFilterRadius = `getAttr "MayaKrakatoaRenderSettings.voxelFilterRadius"`;
+					fprint $fileId ( "KrakatoaVoxelFilterRadius="+ $krakatoaVoxelFilterRadius + "\n" );
+				}
+				
+				int $krakatoaForceEXROutput = `getAttr "MayaKrakatoaRenderSettings.forceEXROutput"`;
+				if($krakatoaForceEXROutput == 1) { $boolVal = "True"; }
+				else { $boolVal = "False"; }
+				fprint $fileId ( "KrakatoaForceEXROutput=" + $boolVal + "\n" );
+				
+			}
+			
+			if( $renderer == "arnold" )
+			{
+				string $arnoldVerbose = `optionMenuGrp -q -value frw_arnoldVerbose`;
+				fprint $fileId ( "ArnoldVerbose=" + $arnoldVerbose + "\n" );
+			}
+				
+			if( $renderer == "mentalRay" )
+			{
+				string $mentalRayVerbose = `optionMenuGrp -q -value frw_mentalRayVerbose`;
+				fprint $fileId ( "MentalRayVerbose=" + $mentalRayVerbose + "\n" );
+				
+				int $autoMemoryLimit = `checkBox -q -value frw_autoMemoryLimit`;
+				fprint $fileId ( "AutoMemoryLimit=" + $autoMemoryLimit + "\n" );
+				
+				int $memoryLimit = `intSliderGrp -q -v frw_memoryLimit`;
+				fprint $fileId ( "MemoryLimit=" + $memoryLimit + "\n" );
+			}
+			
+			if( $renderer == "redshift" )
+			{
+				int $redshiftGPUsPerTask = `intSliderGrp -q -v frw_redshiftGPUsPerTask`;
+				fprint $fileId ( "RedshiftGPUsPerTask=" + $redshiftGPUsPerTask + "\n" );
+			}
+			
+			if( $renderer == "vray" )
+			{
+				if( $useMayaBatchPlugin )
+				{
+					int $vrayAutoMemoryEnabled = `checkBox -q -value frw_vrayAutoMemoryEnabled`;
+					fprint $fileId ( "VRayAutoMemoryEnabled=" + $vrayAutoMemoryEnabled + "\n" );
+					
+					int $vrayAutoMemoryBuffer = `intSliderGrp -q -v frw_vrayAutoMemoryBuffer`;
+					fprint $fileId ( "VRayAutoMemoryBuffer=" + $vrayAutoMemoryBuffer + "\n" );
+				}
+			}
+			
+			if( $renderer == "maxwell" )
+			{
+				fprint $fileId ( "MaxwellRenderTime=" + `getAttr "maxwellRenderOptions.renderTime"` + "\n" );
+				fprint $fileId ( "MaxwellSamplingLevel=" + `getAttr "maxwellRenderOptions.samplingLevel"` + "\n" );
+				fprint $fileId ( "MaxwellResumeRender=false\n" );
+			}
+			
+			if( $renderer == "OctaneRender" )
+			{
+				fprint $fileId ( "OctaneMaxSamples=" + `getAttr "octaneSettings.MaxSamples"` + "\n" );
+			}
+		}
+		
+		//fprint $fileId ( "Version=" + IntMayaVersion() + "\n" );
+		fprint $fileId ( "Version=" + MayaVersion() + "\n" );
+		
+		string $mayaBuild = `optionMenuGrp -q -value frw_mayaBuild`;
+		fprint $fileId ( "Build=" + $mayaBuild + "\n" );
+		
+		fprint $fileId ( "ProjectPath=" + CheckSlashes( `textFieldGrp -q -text frw_projectPath` ) + "\n" );
+		if( !$useMayaBatchPlugin )
+			fprint $fileId ( "CommandLineOptions=" + `textFieldGrp -q -text frw_mayaArgs` + "\n" );
+		else
+			fprint $fileId ( "StartupScript=" + `textFieldButtonGrp -q -text $StartupScriptPathGrp` + "\n" );
+		
+		int $res[] = GetGlobalsResolution();
+		fprint $fileId ( "ImageWidth=" + $res[0] + "\n" );
+		fprint $fileId ( "ImageHeight=" + $res[1] + "\n" );
+		//if( $renderer != "vray" )
+		//	fprint $fileId ( "AspectRatio=" + `getAttr "defaultResolution.deviceAspectRatio"` + "\n" );
+		
+		// Skip existing is only supported in 2014 and later, and by specific renderers.
+		if( IntMayaVersion() >= 2014 && ($renderer == "mentalRay" || $renderer == "mayaSoftware" || $renderer == "mayaHardware" || $renderer == "mayaHardware2" || $renderer == "mayaVector") )
+		{
+			int $skipExistingFrames = `getAttr defaultRenderGlobals.skipExistingFrames`;
+			fprint $fileId ( "SkipExistingFrames=" + $skipExistingFrames + "\n" );
+		}
+		
+		string $baseOutputFilePath = CheckSlashes( `textFieldGrp -q -text frw_outputFilePath` );
+		fprint $fileId ( "OutputFilePath=" + $baseOutputFilePath + "\n" );
+		if( IsRenderLayersOn() && !$submitEachRenderLayer )
+			fprint $fileId ( "OutputFilePrefix=\n" );
+		else if( $jobType == $MaxwellExportJobType )
+			fprint $fileId ( "OutputFilePrefix=\n" );
+		else
+		{
+			string $mayaOutputFilePrefix = GetMayaOutputPrefix( $camera );
+			if( $jobType == $MayaRenderJobType && $regionRendering )
+			{
+				
+				int $regionType = `optionMenuGrp -q -select frw_regionRenderType`;  
+				if($regionType == $TileRegionRenderType)
+					$mayaOutputFilePrefix = GetTileOutputPrefix( $mayaOutputFilePrefix, $currX, $currY, $tilesInX, $tilesInY );
+				else
+					$mayaOutputFilePrefix = GetJigsawOutputPrefix( $mayaOutputFilePrefix, $currTile );
+				
+				// Renderman strips the leading '_' from output file names, so we need to add an additional one.
+				if( $renderer == "renderMan" || $renderer == "renderManRIS" )
+					$mayaOutputFilePrefix = "_" + $mayaOutputFilePrefix;
+			}
+			
+			fprint $fileId ( "OutputFilePrefix=" + addCameraOverride($mayaOutputFilePrefix,$cameraOverride)+ "\n" );	
+		}
+		
+		//fprint $fileId ( "MotionBlur=" + GetMotionBlur() + "\n" );
+			
+		// If the user has specified a camera, make it the default
+		fprint $fileId ( "Camera=" + $camera + "\n" );
+		
+		// Now list all the camera options
+		fprint $fileId ("Camera0=\n");
+		string $cameraNames[] = `listTransforms -cameras`;
+		for( $n = 1 ; $n <= size($cameraNames); $n++ )
+			fprint $fileId ( "Camera" + $n + "=" + $cameraNames[ $n - 1 ] + "\n" );
+		
+		string $sceneFilePath = CheckSlashes( `file -q -sceneName` );
+		int $submitMayaSceneFile = `checkBox -q -value frw_submitMayaScene`;
+		if( !$submitMayaSceneFile )
+			fprint $fileId ( "SceneFile=" + $sceneFilePath + "\n" );
+		
+		int $ignoreError211 = `checkBox -q -value frw_ignoreError211`;
+		fprint $fileId ( "IgnoreError211=" + $ignoreError211 + "\n" );
+		
+		fclose $fileId;

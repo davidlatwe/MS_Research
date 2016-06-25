@@ -1,0 +1,218 @@
+###comment###
+actualPresetPrecomp = (rawLight * diffuse) + (rawGI * diffuse) + specular + (rawReflection * reflectionFilter) + (rawRefraction * refractionFilter) + background + selfIllum
+presetPass = rawLight,rawGI,diffuse,specular,rawReflection,reflectionFilter,rawRefraction,refractionFilter,background,selfIllum
+
+###preComp###
+Root {
+ inputs 0
+ name deeX_preComp_nukeFilePath
+ first_frame deeX_preComp_startFrame
+ last_frame deeX_preComp_endFrame
+ format "deeX_preComp_width deeX_preComp_height 0 0 deeX_preComp_width deeX_preComp_height 1 "
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageMaster
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_master
+ xpos -181
+ ypos 55
+}
+set N824b1b0 [stack 0]
+push $N824b1b0
+Read {
+ inputs 0
+ file deeX_preComp_imageRefractionFilter
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_refractionFilter
+ xpos 323
+ ypos -160
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageRawRefraction
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_rawRefraction
+ xpos 471
+ ypos -56
+}
+Merge2 {
+ inputs 2
+ operation multiply
+ name Merge10
+ xpos 323
+ ypos -26
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageSpecular
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_specular
+ xpos 169
+ ypos -168
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageReflectionFilter
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_reflectionFilter
+ xpos 326
+ ypos -371
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageRawReflection
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_rawReflection
+ xpos 475
+ ypos -269
+}
+Merge2 {
+ inputs 2
+ operation multiply
+ name Merge9
+ xpos 326
+ ypos -239
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageBackground
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_background
+ xpos 172
+ ypos -385
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageSelfIllum
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_selfIllum
+ xpos 174
+ ypos -494
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageRawGI
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_rawGI
+ xpos 265
+ ypos -662
+}
+Read {
+ inputs 0
+ file deeX_preComp_imageDiffuse
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_diffuse
+ xpos 26
+ ypos -806
+}
+set N86682a0 [stack 0]
+Merge2 {
+ inputs 2
+ operation multiply
+ name Merge7
+ xpos 116
+ ypos -632
+}
+push $N86682a0
+Read {
+ inputs 0
+ file deeX_preComp_imageRawLight
+ first deeX_preComp_startFrame
+ last deeX_preComp_endFrame
+ origset true
+ name Vray_rawLight
+ xpos -208
+ ypos -654
+}
+Merge2 {
+ inputs 2
+ operation multiply
+ name Merge5
+ xpos -72
+ ypos -624
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge1
+ xpos 26
+ ypos -520
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge8
+ xpos 26
+ ypos -464
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge6
+ xpos 26
+ ypos -355
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge2
+ xpos 26
+ ypos -239
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge3
+ xpos 26
+ ypos -138
+}
+Merge2 {
+ inputs 2
+ operation plus
+ name Merge4
+ xpos 26
+ ypos -26
+}
+Copy {
+ inputs 2
+ from0 rgba.alpha
+ to0 rgba.alpha
+ name Copy1
+ selected true
+ xpos 26
+ ypos 29
+}
+Switch {
+ inputs 2
+ name Switch1
+ xpos 26
+ ypos 85
+}
+Viewer {
+ frame 1
+ input_process false
+ name Viewer1
+ xpos 26
+ ypos 168
+}
