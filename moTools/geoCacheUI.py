@@ -384,9 +384,9 @@ def btncmd_GEO(sceneName, *args):
 	ignorDuplicateName = checkBox('cBox_ignorDupl', q= 1, v= 1)
 	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
 	sceneName_override = str(textField('textF_sceneName', q= 1, tx= 1))
-	conflictList = str(textField('textF_filter', q= 1, tx= 1)).split(';')
-	print conflictList
-
+	conflictList = str(textField('textF_filter', q= 1, tx= 1))
+	conflictList = [] if not conflictList else conflictList.split(';')
+	
 	moGeoCache.importGeoCache(
 		sceneName if not sceneName_override else sceneName_override,
 		isPartial = isPartial if isPartial else None,
