@@ -14,6 +14,7 @@ import PySide.QtGui as QtGui
 import PySide.QtCore as QtCore
 import tempfile
 import logging
+import ctypes
 import json
 import os
 import moCache.moGeoCache as moGeoCache; reload(moGeoCache)
@@ -97,6 +98,8 @@ def dp_makePySideUI(ctrlName, myStyle):
 
 	uiPySide = wrapInstance(ctrlName, base)
 	uiPySide.setStyleSheet(myStyle)
+
+	return uiPySide
 
 
 def renewUI(*args):
@@ -248,83 +251,113 @@ def shortDateFormat(latestDate):
 		+ latestDate.split('.')[0].split(' ')[1][:-3]
 
 
+def fileLocationCheck():
+
+	filePath = system.sceneName()
+	if ':' in filePath:
+		drive = filePath.split(':')[0]
+		driveType = ctypes.windll.kernel32.GetDriveTypeW(u'%s:' % drive)
+		if driveType == 4:
+
+			return True
+
+	driveTypes = ['DRIVE_UNKNOWN', 'DRIVE_NO_ROOT_DIR', 'DRIVE_REMOVABLE', 'DRIVE_FIXED', 'DRIVE_REMOTE', 'DRIVE_CDROM', 'DRIVE_RAMDISK']
+	logger.warning('Expecting [DRIVE_REMOTE] path, instead [%s]. -> %s' % (driveTypes[driveType], filePath))
+	confirmDialog(
+		t= u'動作中止',
+		m= u'目前場景檔案並非儲存於網路硬碟。\n'
+			+ u'為確保其他專案成員皆可存取，'
+			+ u'請另存至網路硬碟後再行提交。',
+		b= ['Ok'],
+		db= 'Ok',
+		icn= 'warning'
+		)
+	
+	return False
+
+
 def submitSHD(*args):
 
-	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-	sname = system.sceneName().namebase
-	if sname:
-		assetList = [sname.split('_')[0]] if not assetName_override else [assetName_override]
-		if assetList:
-			updateJSON('SHD', assetList= assetList)
-		else:
-			logger.warning('[SHD] submit faild.')
+	if fileLocationCheck():
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sname = system.sceneName().namebase
+		if sname:
+			assetList = [sname.split('_')[0]] if not assetName_override else [assetName_override]
+			if assetList:
+				updateJSON('SHD', assetList= assetList)
+			else:
+				logger.warning('[SHD] submit faild.')
 
 
 def submitRIG(*args):
 
-	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-	sname = system.sceneName().namebase
-	if sname:
-		assetList = [sname.split('_')[0]] if not assetName_override else [assetName_override]
-		if assetList:
-			updateJSON('RIG', assetList= assetList)
-		else:
-			logger.warning('[RIG] submit faild.')
+	if fileLocationCheck():
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sname = system.sceneName().namebase
+		if sname:
+			assetList = [sname.split('_')[0]] if not assetName_override else [assetName_override]
+			if assetList:
+				updateJSON('RIG', assetList= assetList)
+			else:
+				logger.warning('[RIG] submit faild.')
 
 
 def submitANI(*args):
 
-	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-	sInfo = _getSceneInfo()
-	sname = system.sceneName().namebase
-	if sname:
-		shotNum = sInfo.shotNum
-		assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
-		if shotNum:
-			updateJSON('ANI', shotNum, assetList)
-		else:
-			logger.warning('[ANI] submit faild.')
+	if fileLocationCheck():
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sInfo = _getSceneInfo()
+		sname = system.sceneName().namebase
+		if sname:
+			shotNum = sInfo.shotNum
+			assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
+			if shotNum:
+				updateJSON('ANI', shotNum, assetList)
+			else:
+				logger.warning('[ANI] submit faild.')
 
 
 def submitGEO(*args):
 
-	subdivLevel = intFieldGrp('intF_sdLevel', q= 1, v1= 1)
-	isPartial = checkBox('cBox_isPartial', q= 1, v= 1)
-	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-	sceneName_override = str(textField('textF_sceneName', q= 1, tx= 1))
-	sInfo = _getSceneInfo()
-	sname = system.sceneName().namebase
-	if sname:
-		shotNum = sInfo.shotNum
-		assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
-		moGeoCache.exportGeoCache(
-			subdivLevel = subdivLevel if subdivLevel else None,
-			isPartial = isPartial if isPartial else None,
-			assetName_override = assetName_override if assetName_override else None,
-			sceneName_override = sceneName_override if sceneName_override else None
-			)
+	if fileLocationCheck():
+		subdivLevel = intFieldGrp('intF_sdLevel', q= 1, v1= 1)
+		isPartial = checkBox('cBox_isPartial', q= 1, v= 1)
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sceneName_override = str(textField('textF_sceneName', q= 1, tx= 1))
+		sInfo = _getSceneInfo()
+		sname = system.sceneName().namebase
+		if sname:
+			shotNum = sInfo.shotNum
+			assetList = moGeoCache.getAssetList() if not assetName_override else [assetName_override]
+			moGeoCache.exportGeoCache(
+				subdivLevel = subdivLevel if subdivLevel else None,
+				isPartial = isPartial if isPartial else None,
+				assetName_override = assetName_override if assetName_override else None,
+				sceneName_override = sceneName_override if sceneName_override else None
+				)
 
-		if assetList and shotNum:
-			updateJSON('GEO', shotNum, assetList)
-		else:
-			logger.warning('[GEO] submit faild.')
+			if assetList and shotNum:
+				updateJSON('GEO', shotNum, assetList)
+			else:
+				logger.warning('[GEO] submit faild.')
 
 
 def submitCAM(*args):
 
-	assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
-	sInfo = _getSceneInfo()
-	sname = system.sceneName().namebase
-	if sname:
-		shotNum = sInfo.shotNum
-		camera = [dag for dag in ls(sl= 1) if dag.getShape() and dag.getShape().type() == 'camera']
-		if camera:
-			select(camera, r= 1)
-			filePath = moCam.exportCam()
-			if shotNum and filePath:
-				updateJSON('CAM', shotNum, filePath= filePath)
-		else:
-			logger.warning('[CAM] submit faild.')
+	if fileLocationCheck():
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sInfo = _getSceneInfo()
+		sname = system.sceneName().namebase
+		if sname:
+			shotNum = sInfo.shotNum
+			camera = [dag for dag in ls(sl= 1) if dag.getShape() and dag.getShape().type() == 'camera']
+			if camera:
+				select(camera, r= 1)
+				filePath = moCam.exportCam()
+				if shotNum and filePath:
+					updateJSON('CAM', shotNum, filePath= filePath)
+			else:
+				logger.warning('[CAM] submit faild.')
 
 
 def btncmd_ANI(filePath, *args):
@@ -706,14 +739,24 @@ def mkShotListBtn(windowName):
 		# check animation
 		if not os.path.exists(filePath_ANI):
 			button(btn_ANI, e= 1, en= 0)
-			dp_makePySideUI(btn_ANI, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+			if filePath_ANI: button(btn_ANI, e= 1, ann= button(btn_ANI, q= 1, ann= 1) + ' (Not Exists)')
+			text(txt_ANI, e= 1, en= 0)
+			uiObj = dp_makePySideUI(btn_ANI, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+			if filePath_ANI: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
+			uiObj = dp_makePySideUI(txt_ANI, 'QObject {color: %s;}' % colorGray)
+			if filePath_ANI: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
 		else:
 			ver = sInfo.getVerSN(sceneName_ANI)
 			button(btn_ANI, e= 1, l= btn_ANI_label + (('_' + ver) if ver else ''))
 		# check camera
 		if not os.path.exists(filePath_CAM):
 			button(btn_CAM, e= 1, en= 0)
-			dp_makePySideUI(btn_CAM, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+			if filePath_CAM: button(btn_CAM, e= 1, ann= button(btn_CAM, q= 1, ann= 1) + ' (Not Exists)')
+			text(txt_CAM, e= 1, en= 0)
+			uiObj = dp_makePySideUI(btn_CAM, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+			if filePath_CAM: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
+			uiObj = dp_makePySideUI(txt_CAM, 'QObject {color: %s;}' % colorGray)
+			if filePath_CAM: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
 		else:
 			ver = sInfo.getVerSN(sceneName_CAM)
 			button(btn_CAM, e= 1, l= 'CAM' + (('_' + ver) if ver else ''))
@@ -799,14 +842,24 @@ def mkShotListBtn(windowName):
 			# check SHD
 			if not os.path.exists(filePath_SHD):
 				button(btn_SHD, e= 1, en= 0)
-				dp_makePySideUI(btn_SHD, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_SHD: button(btn_SHD, e= 1, ann= button(btn_SHD, q= 1, ann= 1) + ' (Not Exists)')
+				text(txt_SHD, e= 1, en= 0)
+				uiObj = dp_makePySideUI(btn_SHD, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_SHD: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
+				uiObj = dp_makePySideUI(txt_SHD, 'QObject {color: %s;}' % colorGray)
+				if filePath_SHD: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
 			else:
 				ver = sInfo.getVerSN(sceneName_SHD)
 				button(btn_SHD, e= 1, l= 'SHD' + (('_' + ver) if ver else ''))
 			# check RIG
 			if not os.path.exists(filePath_RIG):
 				button(btn_RIG, e= 1, en= 0)
-				dp_makePySideUI(btn_RIG, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_RIG: button(btn_RIG, e= 1, ann= button(btn_RIG, q= 1, ann= 1) + ' (Not Exists)')
+				text(txt_RIG, e= 1, en= 0)
+				uiObj = dp_makePySideUI(btn_RIG, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_RIG: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
+				uiObj = dp_makePySideUI(txt_RIG, 'QObject {color: %s;}' % colorGray)
+				if filePath_RIG: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
 			else:
 				ver = sInfo.getVerSN(sceneName_RIG)
 				button(btn_RIG, e= 1, l= 'RIG' + (('_' + ver) if ver else ''))
@@ -814,7 +867,12 @@ def mkShotListBtn(windowName):
 			# check GEO
 			if not os.path.exists(geoCacheDir):
 				button(btn_GEO, e= 1, en= 0)
-				dp_makePySideUI(btn_GEO, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_GEO: button(btn_GEO, e= 1, ann= button(btn_GEO, q= 1, ann= 1) + ' (Not Exists)')
+				text(txt_GEO, e= 1, en= 0)
+				uiObj = dp_makePySideUI(btn_GEO, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+				if filePath_GEO: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
+				uiObj = dp_makePySideUI(txt_GEO, 'QObject {color: %s;}' % colorGray)
+				if filePath_GEO: f = uiObj.font();f.setStrikeOut(True);uiObj.setFont(f)
 			else:
 				ver = sInfo.getVerSN(sceneName_GEO)
 				button(btn_GEO, e= 1, l= 'GEO' + (('_' + ver) if ver else ''))
