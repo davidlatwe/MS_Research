@@ -95,7 +95,7 @@ def mFilterOut(rootNode):
 					# has key or expression
 					doAppend = False
 					if cmds.objectType(obj) == 'transform' and cmds.listRelatives(obj, s= 1):
-						if cmds.objectType(cmds.listRelatives(obj, s= 1)[0]) == 'mesh':
+						if cmds.objectType(cmds.listRelatives(obj, s= 1, f= 1)[0]) == 'mesh':
 							doAppend = True
 					if cmds.objectType(obj) == 'mesh':
 						doAppend = True
@@ -112,7 +112,7 @@ def mFilterOut(rootNode):
 							# one of drivers has key or expression
 							doAppend = False
 							if cmds.objectType(obj) == 'transform' and cmds.listRelatives(obj, s= 1):
-								if cmds.objectType(cmds.listRelatives(obj, s= 1)[0]) == 'mesh':
+								if cmds.objectType(cmds.listRelatives(obj, s= 1, f= 1)[0]) == 'mesh':
 									doAppend = True
 							if cmds.objectType(obj) == 'mesh':
 								doAppend = True
