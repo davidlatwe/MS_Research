@@ -4,6 +4,7 @@ Created on 2016.05.12
 
 @author: davidpower
 '''
+import pymel.core as pm
 import maya.cmds as cmds
 import maya.mel as mel
 import mMaya.mOutliner as mOutliner; reload(mOutliner)
@@ -143,10 +144,46 @@ def mFilterOut(rootNode):
 	return anim_meshes, anim_viskey
 
 
+def mDuplicateSelectedOnly(doConstrain= None):
+	"""
+	"""
+	targetList = pm.ls(sl= 1)
+	desGrp = pm.group(n= 'mDuplicateSelectedOnly', w= 1, em= 1)
+	newDags = []
+	for target in targetList:
+		par = pm.duplicate(target, po=1)[0]
+		pm.parent(par, desGrp)
+		par.rename(target)
+		shp = pm.duplicate(target.getShape(), addShape=True)[0]
+		shp.setParent(par, s= 1)
+		new = par.getChildren()[0]
+		pm.parent(new, desGrp)
+		n = par.name()
+		pm.delete(par)
+		new.rename(n)
+		# currently return string type for cmds cmd
+		newDags.append(new.name())
+		if doConstrain:
+			pm.parentConstraint(target, new, mo= 1)
+
+	return newDags
+
+
 def mBakeViskey(anim_viskey, playbackRange):
 	"""
 	"""
 	cmds.bakeResults(anim_viskey, at= '.v', t= playbackRange, sm= 1, s= 0)
+
+
+def mBakeRigkey(rigCtrlList, playbackRange):
+	"""
+	"""
+	cmds.bakeResults(rigCtrlList, at= ['.t', '.r', '.s'], t= playbackRange, sm= 1, s= 0)
+	for ctrl in rigCtrlList:
+		findPC = cmds.listRelatives(ctrl, c= 1, typ= 'parentConstraint')
+		if findPC:
+			for pc in findPC:
+				cmds.delete(pc)
 
 
 def mDuplicateViskey(anim_viskey):
@@ -196,6 +233,7 @@ def mSmoothMesh(ves, subdivLevel):
 
 def mSaveGeoList(geoListFile):
 	"""
+	write out an empty file, we only need file name
 	"""
 	with open(geoListFile, 'w') as geomoTxt:
 		pass
@@ -216,6 +254,7 @@ def mLoadGeoList(geoCacheDir, workingNS, geoFileType):
 			anim_geoDict[geo_trans] = geo_shape
 
 	return anim_geoDict
+
 
 def mLoadVisKeyList(geoCacheDir, mayaFileType):
 	"""
@@ -265,6 +304,19 @@ def mImportViskey(keyFile, assetNS, visAniNode):
 		logger.info('viskey target connected. [' + visAniNode + '] -> {' + visAniMesh + '}')
 	except:
 		logger.warning('viskey target connection failed. [' + visAniNode + '] -x {' + visAniMesh + '}')
+
+
+def mExportRigkey(rigFile):
+	"""
+	輸出 rigging ctrls
+	"""
+	cmds.file(rigFile, f= 1, op= "v=0;", typ= "mayaAscii", es= 1)
+
+
+def mImportRigkey(rigFile):
+	"""
+	"""
+	cmds.file(rigFile, i= 1, typ= 'mayaAscii', iv= 1, mnc= 1, ns= ':')
 
 
 def mExportGeoCache(geoCacheDir, assetName):
@@ -333,25 +385,41 @@ def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateNa
 	"""
 	def importGeoProcess(dag):
 		inputAni = []
-		# check if shape node is hidden by visKey
-		anim_shape = cmds.listRelatives(dag, s= 1, ni= 1, f= 1)[0]
-		if cmds.objectType(anim_shape) != 'mesh':
-			return
-		if not cmds.getAttr(anim_shape + '.v'):
-			inputAni = cmds.listConnections(anim_shape + '.visibility', p= 1, t= 'animCurve')
-			if inputAni:
-				cmds.disconnectAttr(inputAni[0], anim_shape + '.visibility')
-				cmds.setAttr(anim_shape + '.v', 1)
-			else:
+		anim_relatives = cmds.listRelatives(dag, s= 1, ni= 1, f= 1)
+		if anim_relatives:
+			anim_shape = anim_relatives[0]
+			if cmds.objectType(anim_shape) != 'mesh':
 				return
-		cmds.select(dag, r= 1)
-		mel.eval('source doImportCacheArgList')
-		mel.eval('if(catch(`deleteCacheFile 3 {"keep","","geometry"}`)){python"logger.warning(\\"No caches Del.\\")";}')
-		mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
-		if inputAni:
-			cmds.connectAttr(inputAni[0], anim_shape + '.visibility')
+			if not cmds.getAttr(anim_shape + '.v'):
+				# check if shape node is hidden by visKey
+				inputAni = cmds.listConnections(anim_shape + '.visibility', p= 1, t= 'animCurve')
+				if inputAni:
+					cmds.disconnectAttr(inputAni[0], anim_shape + '.visibility')
+					cmds.setAttr(anim_shape + '.v', 1)
+				else:
+					return
+			cmds.select(dag, r= 1)
+			# delete cache
+			for obj in cmds.ls(sl= 1):
+				cacheDeleted = 0
+				hist = cmds.listHistory(obj, pdo= 1)
+				if hist:
+					for histNode in hist:
+						if cmds.nodeType(histNode) == 'cacheFile':
+							cmds.delete(histNode)
+							cacheDeleted = 1
+				if not cacheDeleted:
+					logger.info('No caches Del. -> ' + obj)
+			# import new cache
+			mel.eval('source doImportCacheArgList')
+			mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
+			if inputAni:
+				cmds.connectAttr(inputAni[0], anim_shape + '.visibility')
+		else:
+			logger.warning('This node might not contenting shape node, but source rigging file dose.')
 
 	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1, et= 'transform')
+	# conflictList: if conflict string included in dag name, remove in next step
 	inverseResult = [T for T in targetList for C in conflictList if not T.startswith('|' + assetNS) or C in T]
 	anim_transList = list(set(targetList) - set(inverseResult))
 	if len(anim_transList) == 1:
@@ -387,14 +455,31 @@ def mImportTimeInfo(timeInfoFile):
 		logger.info('TimeInfo  [Range] ' + timeInfo[1])
 
 
-def mGetSmoothExcludeList():
+def mGetSmoothMask(assetName):
 	"""
-	from set or from outside text file
 	"""
-	excludeList = []
-	sets = cmds.ls('*moGeoCacheSmoothExcludeList', r= 1, typ= 'objectSet')
-	if sets:
-		for obj in cmds.sets(sets[0], q= 1, no= 1):
-			excludeList.append(obj.split(':')[-1])
-	
-	return excludeList
+	meshSmoothmask = []
+	setList = cmds.ls('*moGeoCacheSmoothMask', r= 1, typ= 'objectSet')
+	if setList:
+		for set in setList:
+			if ':' not in set or (':' in set and set.startswith(assetName)):
+				for obj in cmds.sets(set, q= 1, no= 1):
+					meshSmoothmask.append(obj.split(':')[-1])
+				break
+				
+	return meshSmoothmask
+
+
+def mGetRigCtrlExportList(assetName):
+	"""
+	"""
+	rigCtrlList = []
+	setList = cmds.ls('*moGeoCacheRigCtrlExport', r= 1, typ= 'objectSet')
+	if setList:
+		for set in setList:
+			if ':' not in set or (':' in set and set.startswith(assetName)):
+				for obj in cmds.sets(set, q= 1, no= 1):
+					rigCtrlList.append(obj)
+				break
+				
+	return rigCtrlList

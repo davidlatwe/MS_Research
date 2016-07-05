@@ -1,0 +1,388 @@
+set cut_paste_input [stack 0]
+version 6.1 v5
+push $cut_paste_input
+add_layer {other other.coverage other.renderId other.zAtmos other.zDepth other.zAtmo other.Z_Atmos}
+Group {
+name idSelector
+help "Colour ID Picker\n---\n\nAttach this node to your render and move the position handle over the object or manually enter the Color ID of the object and press \[Add Matte].\n\n\[Remove Matte] will remove an existing matte using the same method.\n\nPress \[Clear All] to delete all mattes created within this node.\n\n----\n\nCreated by Alican Sesli\nfor LUX VFX"
+knobChanged "\n\n\n\nn = nuke.thisNode()\nk = nuke.thisKnob()\n\n\nif 'position' in k.name():\n\n    posX = n\['position'].value(0)\n    posY = n\['position'].value(1)\n    n.begin()\n    idShuffle = nuke.toNode('idShuffle')\n    sample = nuke.sample(idShuffle,'g', posX, posY)\n    n.end()\n   \n    n\['colorID'].setValue(int(sample))\n    n\['colIDexp'].setValue(int(sample))\n    \n    if n\['reset_on_move'].value()==True:\n        n\['rangemin'].setValue(0)\n        n\['rangemax'].setValue(0)\n        \nif 'colorID' in k.name():\n    n\['colIDexp'].setValue(n\['colorID'].value())\n    if n\['reset_on_move'].value()==True:\n        n\['rangemin'].setValue(0)\n        n\['rangemax'].setValue(0)\n\n\n\n"
+tile_color 0x9fffff
+selected true
+xpos 12154
+ypos -2125
+addUserKnob {20 User l "Color ID Selector"}
+addUserKnob {3 colorID l "Color ID" t "Material ID that is currently selected."}
+addUserKnob {6 overlay l "Selection Overlay" t "Overlays a temporary selection matte. The selection is added once \[Add Matte] is pressed." -STARTLINE}
+addUserKnob {12 position l Position}
+position {1000 500}
+addUserKnob {20 range_grp l "ID Range" n 1}
+range_grp 0
+addUserKnob {6 reset_on_move l "Reset range when new ID is picked" t "Resets the range back to 0 when a new color ID is picked." +STARTLINE}
+reset_on_move true
+addUserKnob {6 use_multiple l "<b>Use Multiple IDPickers (Heavier)</b>" t "Uses multiple IDSelection nodes to select the given range instead of using just one IDSelection node with a zSlice range.\n\nAdvantages of multiple picking is you can remove individual IDs within the range as opposed to not being able to edit the selected range.\n\nThe disadvantage is that its slower especially when selecting a wider range.\n" +STARTLINE}
+use_multiple true
+addUserKnob {3 rangemin l "" t "Start of range." +STARTLINE}
+addUserKnob {3 colIDexp l - t "Start and End of Range is defined around the selected Color ID." -STARTLINE +DISABLED}
+addUserKnob {3 rangemax l + t "End of range" -STARTLINE}
+addUserKnob {20 endGroup n -1}
+addUserKnob {26 ""}
+addUserKnob {22 addMatte l "Add Matte" T "#nuke.root().begin()\n\ntry:\n    n = nuke.thisNode()\n    print n.name()\n    rmin = n\['rangemin'].value()\n    rmax = n\['rangemax'].value()\n\n    n.begin()\n\n    nuke.selectAll()\n    nuke.invertSelection()\n\n\n    for e in nuke.allNodes():\n        if e\['label'].value() == str(int(n\['colorID'].value())):\n            nuke.delete(e)\n        \n\n    idSel = nuke.toNode('idareaselect')\n    \n\n    idSel.setSelected(True)\n\n    nuke.nodeCopy(nukescripts.cut_paste_file())\n\n    if n\['use_multiple'].value()==True:\n        print int(n\['colorID'].value())-int(rmin)\n        print int(n\['colorID'].value())+int(rmax)\n        for i in range( int(n\['colorID'].value())-int(rmin), int(n\['colorID'].value())+int(rmax) +1):\n            for e in nuke.allNodes():\n                    if e\['label'].value() == str(int(i)):\n                        nuke.delete(e)\n            idSel2 = nuke.nodePaste(nukescripts.cut_paste_file())\n            idSel2\['idselect'].setValue(i)\n            idSel2\['label'].setValue(str(i))\n            idSel2.setSelected(False)\n            idSel2.setInput(0, nuke.toNode('Shuffle_renderID'))\n            \n            \n    \n    if n\['use_multiple'].value()==False:\n        print 'c'\n        idSel2 = nuke.nodePaste(nukescripts.cut_paste_file())\n        idSel2\['idselect'].setValue(n\['colorID'].value())\n        idSel2\['label'].setValue(str(int(n\['colorID'].value())))\n        idSel2.setSelected(False)\n        idSel2.setInput(0, nuke.toNode('Shuffle_renderID'))\n    \n    \n        idSel2.begin()\n        expNode = nuke.toNode('Expression')\n        expNode\['temp_expr1'].setValue(str(int(rmin)))\n        expNode\['temp_expr2'].setValue(str(int(rmax)))  \n        idSel2.end()\n    \n\n    idNodes=\[]\n    aa = nuke.toNode('AA')\n\n    for i in nuke.allNodes():\n        if i\['label'].value() == '':\n            try:\n                nuke.delete(i)\n            except:\n                pass\n        try:\n            if i\['label'].value() != 'static':\n                try:\n                    idNodes.append(i)\n                except:\n                    pass\n        except:\n            pass\n            \n    m = nuke.createNode('Merge2', inpanel=False)\n    m.setInput(0, None)\n    m.setInput(1, None)\n    m.setInput(2, None)\n\n    m.setSelected(False)\n    t = 2\n\n    for i in idNodes:\n        t+=1\n        print str(int(i\['idselect'].value()))\n        m.setInput(t, i)\n        \n    sc = nuke.createNode('ShuffleCopy', inpanel=False)\n    sc.setSelected(False)\n    sc.setInput(0, nuke.toNode('Shuffle1'))\n    sc.setInput(1, aa)\n\n    \n    \n    nuke.toNode('Output').setInput(0, nuke.toNode('Switch_gui'))\n    nuke.toNode('Switch').setInput(0, sc)\n    nuke.toNode('ChannelMerge').setInput(1, aa)\n    aa.setInput(0, m)\n    \n    \n\n\n    n.end()\n\nexcept:\n    nuke.root().begin()\n    nuke.message(\"Select only the ID Selector node.\")" +STARTLINE}
+addUserKnob {22 removeMatte l "Remove Matte" -STARTLINE T "#nuke.root().begin()\n\n#try:\nn = nuke.thisNode()\nrmin = n\['rangemin'].value()\nrmax = n\['rangemax'].value()\nn.begin()\n\nnuke.selectAll()\nnuke.invertSelection()\ndeleteNode = None\n\nfor x in range( int(n\['colorID'].value())-int(rmin), int(n\['colorID'].value())+int(rmax) +1):\n    for i in nuke.allNodes():\n        if i\['label'].value()==str(int(x)):\n            deleteNode = i\n        \n    m=nuke.toNode('Merge1')\n    t = 2\n    try:\n        for i in range(3, m.inputs()):\n            t+=1\n            try:\n                if m.input(i).name()==deleteNode.name(): \n                    nuke.toNode('Merge1').setInput(i, None)\n                    nuke.delete(deleteNode)\n            except:\n                pass\n    except:\n        pass\n    \nn.end()\n'''\nexcept:\n    nuke.root().begin()\n    nuke.message(\"Select only the ID Selector node.\")\n    \n    \n'''\n    "}
+addUserKnob {22 clearAll l "Clear All" -STARTLINE T "#nuke.root().begin()\n\ntry:\n    n = nuke.thisNode()\n\n\n    n.begin()\n\n    nuke.selectAll()\n    nuke.invertSelection()\n\n    for i in nuke.allNodes():\n        if i\['label'].value()!='static':\n            nuke.delete(i)\n\n\n    n.end()\nexcept:\n    nuke.root().begin()\n    nuke.message(\"Select only the ID Selector node.\")"}
+addUserKnob {26 ""}
+addUserKnob {6 addAlpha l "Additive Alpha" t "Alpha is added on top of the original input alpha. \n\n<b>Input alpha must be set to None.</b>\n\nIf the Input alpha is set to None, idSelector nodes can be stacked up." +STARTLINE}
+addUserKnob {41 in_1 l INVISIBLE +INVISIBLE T idShuffle.in}
+addUserKnob {41 from0 l "RenderID channel" t "This channel is used for picking the render IDs." T Copy_renderID.from0}
+addUserKnob {41 from0_1 l "Coverage channel" t "The coverage channel is used for anti-aliasing." T Copy_coverage.from0}
+}
+Input {
+inputs 0
+name Input
+label static
+xpos 736
+ypos -249
+}
+set N6ebd1000 [stack 0]
+Clamp {
+maximum_enable false
+MinClampTo_enable true
+name Clamp
+label static
+xpos 1071
+ypos -12
+}
+set N6ebd0c00 [stack 0]
+push $N6ebd0c00
+Copy {
+inputs 2
+from0 other.renderId
+to0 rgba.alpha
+name Copy_renderID
+label static
+xpos 1133
+ypos 71
+}
+set N6ebd0800 [stack 0]
+Shuffle {
+red alpha
+green alpha
+blue alpha
+name idShuffle
+label static
+xpos 1294
+ypos 77
+}
+push $N6ebd0800
+Shuffle {
+red alpha
+green alpha
+blue alpha
+name Shuffle_renderID
+label static
+xpos 1133
+ypos 132
+}
+Expression {
+temp_name0 n
+temp_expr0 parent.colIDexp
+temp_name1 rm
+temp_expr1 abs(parent.rangemin)
+temp_name2 rp
+temp_expr2 abs(parent.rangemax)
+temp_name3 e
+temp_expr3 n!=0?clamp(a>=n-rm?a<=n+rp?1:0:0):0
+expr0 e
+expr1 0
+expr2 0
+channel3 alpha
+expr3 e
+name overlay_exp
+label static
+xpos 1133
+ypos 836
+disable {{!parent.overlay}}
+}
+push $N6ebd0c00
+push $N6ebd0c00
+Copy {
+inputs 2
+from0 other.coverage
+to0 rgba.alpha
+name Copy_coverage
+label static
+xpos 1006
+ypos 71
+}
+Shuffle {
+red alpha
+green alpha
+blue alpha
+name Shuffle_coverage
+label static
+xpos 1006
+ypos 132
+}
+push 0
+Group {
+inputs 2
+name AA
+label static
+xpos 1006
+ypos 510
+disable {{!clamp(parent.from0_1)}}
+}
+Input {
+inputs 0
+name renderIDs
+xpos 383
+ypos 320
+}
+Shuffle {
+red black
+green black
+blue black
+name Shuffle9
+xpos 383
+ypos 446
+}
+set N6ec24800 [stack 0]
+Dot {
+name Dot1
+xpos 629
+ypos 449
+}
+Dot {
+name Dot20
+xpos 629
+ypos 854
+}
+push $N6ec24800
+Erode {
+channels {rgba.alpha none none rgba.alpha}
+size 1
+name Erode3
+xpos 490
+ypos 602
+}
+push $N6ec24800
+Erode {
+size {{Erode3.size*-1}}
+name Erode4
+xpos 383
+ypos 600
+}
+Add {
+inputs 1+1
+channels alpha
+value -1
+name Add1
+xpos 383
+ypos 652
+}
+Invert {
+name Invert1
+xpos 383
+ypos 695
+}
+Input {
+inputs 0
+name coverage
+xpos 249
+ypos 321
+number 1
+}
+ColorCorrect {
+gamma 0.5
+shadows.gamma 0.254
+name InputCoverage1
+xpos 249
+ypos 426
+}
+Shuffle {
+red black
+green black
+blue black
+alpha red
+name Shuffle11
+xpos 249
+ypos 450
+}
+Invert {
+channels alpha
+name InvertCoverage1
+xpos 249
+ypos 593
+}
+Add {
+inputs 1+1
+channels alpha
+value -1
+name Add4
+xpos 249
+ypos 695
+}
+Clamp {
+name Clamp1
+xpos 249
+ypos 741
+}
+Merge2 {
+inputs 2
+name Merge3
+xpos 249
+ypos 851
+}
+Shuffle {
+red alpha
+green alpha
+blue alpha
+name Shuffle2
+xpos 249
+ypos 915
+}
+Output {
+name Output1
+xpos 249
+ypos 1004
+}
+end_group
+push $N6ebd1000
+ChannelMerge {
+inputs 2
+name ChannelMerge
+label static
+xpos 704
+ypos 498
+}
+push $N6ebd1000
+Shuffle {
+alpha black
+name Shuffle1
+label static
+xpos 570
+ypos 609
+}
+Switch {
+inputs 2
+which {{parent.addAlpha}}
+name Switch
+label static
+xpos 704
+ypos 790
+}
+set N6efae000 [stack 0]
+Merge2 {
+inputs 2
+operation plus
+mix 0.2
+name Merge_overlay1
+label static
+xpos 874
+ypos 1002
+disable {{!parent.overlay}}
+}
+push $N6efae000
+Switch {
+inputs 2
+which {{"\$gui"}}
+name Switch_gui
+label static
+xpos 704
+ypos 1074
+disable {{!parent.overlay}}
+}
+Output {
+name Output
+label static
+xpos 704
+ypos 1225
+}
+Group {
+inputs 0
+name idareaselect
+label static
+xpos 1550
+ypos 29
+addUserKnob {20 User}
+addUserKnob {18 idselect l "ID Select" R 0 1000}
+idselect 32
+addUserKnob {6 idselect_panelDropped l "panel dropped state" -STARTLINE +HIDDEN}
+addUserKnob {41 dof l "Field Width" T ZSlice2.dof}
+}
+Input {
+inputs 0
+name renderID
+xpos 530
+ypos -694
+}
+Dot {
+name Dot4
+xpos 564
+ypos -605
+}
+set N6efeac00 [stack 0]
+Viewer {
+input_number 1
+input_process false
+name Viewer1
+xpos 998
+ypos -218
+}
+push $N6efeac00
+Expression {
+temp_name0 n
+temp_expr0 parent.idselect
+temp_name1 rm
+temp_expr1 0
+temp_name2 rp
+temp_expr2 0
+channel3 alpha
+expr3 a>=n-abs(rm)?a<=n+abs(rp)?1:0:0
+name Expression
+xpos 530
+ypos -496
+}
+Shuffle {
+red alpha
+green alpha
+blue alpha
+name Shuffle1
+xpos 530
+ypos -472
+}
+Clamp {
+channels rgba
+name ClampALL1
+xpos 530
+ypos -439
+}
+push $N6efeac00
+Dot {
+name Dot2
+xpos 730
+ypos -605
+}
+Copy {
+inputs 2
+from0 rgba.alpha
+to0 rgba.alpha
+name Copy1
+xpos 696
+ypos -445
+}
+Output {
+name Output1
+xpos 696
+ypos -351
+}
+push $N6efeac00
+ZSlice {
+Zchan rgba.alpha
+center {{parent.idselect}}
+dof 1
+name ZSlice2
+xpos 287
+ypos -551
+}
+end_group
+end_group

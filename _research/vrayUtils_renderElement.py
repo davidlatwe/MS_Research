@@ -13,13 +13,13 @@ def vrre_coverage():
 	vrre.set('name', 'coverage')
 
 
-def vrre_drBucket():
+def vrre_drBucket(align= None):
 	"""
 	DR_Bucket
 	"""
 	vrre = vrUtils.create('RenderChannelDRBucket', 'vrayRE_DR_Bucket')
 	vrre.set('name', 'DR')
-	vrre.set('text_alignment', 0)
+	vrre.set('text_alignment', align if align else 0)
 
 
 def vrre_objectSelect():

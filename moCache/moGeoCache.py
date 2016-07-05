@@ -41,7 +41,7 @@ def getGeoCacheDir(assetName, sceneName):
 	return moRules.rGeoCacheDir(assetName, sceneName)
 
 
-def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None, sceneName_override= None):
+def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None, sceneName_override= None, smoothInclusive= None):
 	"""
 	輸出 geoCache
 	"""
@@ -50,6 +50,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 	# namespace during action
 	workingNS = moRules.rWorkingNS()
 	viskeyNS = moRules.rViskeyNS()
+	rigkeyNS = moRules.rRigkeyNS()
 	# get playback range
 	playbackRange = moRules.rPlaybackRange()
 	# get frame rate
@@ -78,6 +79,8 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 	moMethod.mCleanWorkingNS(workingNS)
 	# remove mGCVisKey namespace
 	moMethod.mCleanWorkingNS(viskeyNS)
+	# remove mGCRigKey namespace
+	moMethod.mCleanWorkingNS(rigkeyNS)
 
 	logger.info('GeoCache' + (' PARTIAL' if isPartial else '') + ' export start.')
 	logger.info('export queue: ' + str(len(rootNode_List)))
@@ -95,7 +98,9 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
 		geoCacheDir = getGeoCacheDir(assetName, sceneName_override)
 		geoFileType = moRules.rGeoFileType()
-		excludeList = moMethod.mGetSmoothExcludeList()
+		excludeList = moMethod.mGetSmoothMask(assetName)
+		rigCtrlList = moMethod.mGetRigCtrlExportList(assetName)
+		smoothInclusive = True if smoothInclusive else False
 
 		logger.info('AssetName: [' + assetName + ']')
 
@@ -107,10 +112,12 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 		if isPartial:
 			anim_viskey = [dag for dag in anim_viskey if dag.split('|')[-1].split(':')[-1] in partial_Dict[rootNode]]
 			anim_meshes = [dag for dag in anim_meshes if dag.split('|')[-1].split(':')[-1] in partial_Dict[rootNode]]
-
+		
 		''' visibility
 		'''
 		if anim_viskey:
+			# open undo chunk, for later undo from visKey bake 
+			cmds.undoInfo(ock= 1)
 			# Add and Set namespace
 			logger.info('viskeyNS: <' + viskeyNS + '> Set.')
 			moMethod.mSetupWorkingNS(viskeyNS)
@@ -126,8 +133,37 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 			# remove mGCVisKey namespace
 			logger.info('viskeyNS: <' + viskeyNS + '> Del.')
 			moMethod.mCleanWorkingNS(viskeyNS)
+			# close undo chunk, and undo
+			cmds.undoInfo(cck= 1)
+			cmds.undo()
 		else:
 			logger.warning('No visibility key.')
+
+		''' rigging ctrls
+		'''
+		if rigCtrlList and not isPartial:
+			# open undo chunk, for later undo from rigging ctrls bake 
+			cmds.undoInfo(ock= 1)
+			# Add and Set namespace
+			logger.info('rigkeyNS: <' + rigkeyNS + '> Set.')
+			moMethod.mSetupWorkingNS(rigkeyNS)
+			# duplicate ctrls
+			cmds.select(rigCtrlList, r= 1)
+			rigCtrlList = moMethod.mDuplicateSelectedOnly(1)
+			# bake rigging ctrls
+			moMethod.mBakeRigkey(rigCtrlList, playbackRange)
+			# export baked rigging ctrls
+			cmds.select(rigCtrlList, r= 1)
+			rigFile = moRules.rRigkeyFilePath(geoCacheDir, assetName)
+			moMethod.mExportRigkey(rigFile)
+			# remove mGCVisKey namespace
+			logger.info('rigkeyNS: <' + rigkeyNS + '> Del.')
+			moMethod.mCleanWorkingNS(rigkeyNS)
+			# close undo chunk, and undo
+			cmds.undoInfo(cck= 1)
+			cmds.undo()
+		else:
+			logger.warning('No rigging controls to export.')
 		
 		''' geoCache
 		'''	
@@ -140,7 +176,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 			# subdiv before export
 			if subdivLevel:
 				for ves in cmds.listRelatives(ves_grp, c= 1):
-					if ves.split(':')[-1] not in excludeList:
+					if ((ves.split(':')[-1] not in excludeList) + smoothInclusive) % 2:
 						moMethod.mSmoothMesh(ves, subdivLevel)
 			# write out transform node's name
 			for ves in cmds.listRelatives(ves_grp, c= 1):
@@ -241,7 +277,7 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 			logger.warning('[' + rootNode + '] No geoList file to follow.')
 
 		# get viskey from ma file
-		visAniNodeList = moMethod.mLoadVisKeyList(geoCacheDir, '.ma')
+		visAniNodeList = moMethod.mLoadVisKeyList(geoCacheDir, '_visKeys.ma')
 		if visAniNodeList:
 			if isPartial:
 				visAniNodeList = [ dag for dag in visAniNodeList if dag in partial_Dict[rootNode] ]
@@ -256,6 +292,14 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 					moMethod.mImportViskey(keyFile, assetNS, viskeyNS.split(':')[-1] + ':' + visAniNode)
 		else:
 			logger.warning('[' + rootNode + '] No visibility key file to import.')
+
+		# get rigging ctrls from ma file
+		rigFile = moRules.rRigkeyFilePath(geoCacheDir, assetName)
+		if cmds.file(rigFile, q= 1, ex= 1):
+			# import rigging ctrls
+			moMethod.mImportRigkey(rigFile)
+		else:
+			logger.warning('[' + rootNode + '] No rigging controls to import.')
 
 		# go set frameRate and playback range
 		if isPartial:

@@ -118,14 +118,16 @@ def dataStruct_proj():
 def dataStruct_asset():
 
 	return {
-		'SHD':{},
-		'RIG':{}
+		'MOD':{"MST": {}, "WIP": {}},
+		'SHD':{"MST": {}, "WIP": {}},
+		'RIG':{"MST": {}, "WIP": {}}
 	}
 
 
 def dataStruct_shots():
 
 	return {
+		'INF':{'fps':0.0, 'min':0, 'max':0},
 		'ANI':{},
 		'GEO':{},
 		'CAM':{}
@@ -184,14 +186,23 @@ def updateJSON(subTyp, shotNum= None, assetList= None, filePath= None):
 					else:
 						logger.warning('[ANI] assigned with [%s], but this asset is not registered.' % ast)
 
+	if shotNum and subTyp in ['ANI', 'CAM', 'GEO']:
+		sInfo = _getSceneInfo()
+		gcLog['shots'][shotNum]['INF']['fps'] = sInfo.fps
+		gcLog['shots'][shotNum]['INF']['min'] = sInfo.palybackStart
+		gcLog['shots'][shotNum]['INF']['max'] = sInfo.palybackEnd
+
 
 	# update asset
-	if assetList and subTyp in ['SHD', 'RIG']:
+	if assetList and subTyp in ['MOD', 'SHD', 'RIG']:
 		if filePath:
 			for ast in assetList:
 				if not ast in gcLog['asset'].keys():
 					gcLog['asset'][ast] = dataStruct_asset()
-				gcLog['asset'][ast][subTyp][cDate] = filePath
+				if 'master' in str(snameObj.namebase):
+					gcLog['asset'][ast][subTyp]['MST'][cDate] = filePath
+				else:
+					gcLog['asset'][ast][subTyp]['RIG'][cDate] = filePath
 		else:
 			goUpdate = False
 			logger.warning('[%s] can\'t submit, due to filePath is incorrect. -> %s' % filePath)
@@ -274,6 +285,19 @@ def fileLocationCheck():
 		)
 	
 	return False
+
+
+def submitMOD(*args):
+
+	if fileLocationCheck():
+		assetName_override = str(textField('textF_assetName', q= 1, tx= 1))
+		sname = system.sceneName().namebase
+		if sname:
+			assetList = [sname.split('_')[0]] if not assetName_override else [assetName_override]
+			if assetList:
+				updateJSON('MOD', assetList= assetList)
+			else:
+				logger.warning('[MOD] submit faild.')
 
 
 def submitSHD(*args):
@@ -362,20 +386,21 @@ def submitCAM(*args):
 
 def btncmd_ANI(filePath, *args):
 
-	try:
-		system.openFile(filePath)
-	except:
-		decision = confirmDialog(
-			t= u'警告',
-			m= u'目前場景有未儲存的變更\n要忽略嗎 ?\n繼續開啟檔案請按 [Yes]',
-			b= ['Yes', 'No'],
-			db= 'Yes',
-			cb= 'No',
-			ds= 'No',
-			icn= 'warning'
-			)
-		if decision == 'Yes':
-			system.openFile(filePath, f= 1)
+	if filePath:
+		try:
+			system.openFile(filePath)
+		except:
+			decision = confirmDialog(
+				t= u'警告',
+				m= u'目前場景有未儲存的變更\n要忽略嗎 ?\n繼續開啟檔案請按 [Yes]',
+				b= ['Yes', 'No'],
+				db= 'Yes',
+				cb= 'No',
+				ds= 'No',
+				icn= 'warning'
+				)
+			if decision == 'Yes':
+				system.openFile(filePath, f= 1)
 
 
 def btncmd_GEO(sceneName, *args):
@@ -399,6 +424,25 @@ def btncmd_GEO(sceneName, *args):
 def btncmd_CAM(shotNum, *args):
 	
 	moCam.referenceCam(shotNum)
+
+
+def btncmd_AST(filePath, *args):
+
+	if filePath:
+		try:
+			system.openFile(filePath)
+		except:
+			decision = confirmDialog(
+				t= u'警告',
+				m= u'目前場景有未儲存的變更\n要忽略嗎 ?\n繼續開啟檔案請按 [Yes]',
+				b= ['Yes', 'No'],
+				db= 'Yes',
+				cb= 'No',
+				ds= 'No',
+				icn= 'warning'
+				)
+			if decision == 'Yes':
+				system.openFile(filePath, f= 1)
 
 
 def btncmd_SHD(filePath, *args):
@@ -554,7 +598,24 @@ def ui_setProject(*args):
 	setParent('..')
 
 
-def mkAssetListBtn(windowName):
+def mkAssetListBtn(windowName, assetColumn):
+
+	def expandCollapseFrames(btnExpCol, *args):
+		if button(btnExpCol, q= 1, l= 1) == 'Expand All':
+			cmd = 0
+			button(btnExpCol, e= 1, l= 'Collapse All')
+		else:
+			cmd = 1
+			button(btnExpCol, e= 1, l= 'Expand All')
+		for ui in columnLayout(assetColumn, q= 1, ca= 1):
+			if objectTypeUI(ui) == 'frameLayout':
+				frameLayout(ui, e= 1, cl= cmd)
+	text(l= '', h= 1)
+	rowLayout(nc= 2, adj= 1)
+	btnExpCol = button(l= 'Collapse All', w= 340)
+	button(btnExpCol, e= 1, c= partial(expandCollapseFrames, btnExpCol))
+	dp_makePySideUI(btnExpCol, 'QPushButton {color: #%s; background-color: #%s}' % ('598075', '454545'))
+	setParent('..')
 
 	sInfo = _getSceneInfo()
 	userHistory = getUserHistory()
@@ -572,14 +633,14 @@ def mkAssetListBtn(windowName):
 		
 		# asset frameLayout
 		BGcolor = rgb_nor(frameBaseColor)
-		assetFrameName = frameLayout(l= asset, cll= 1, bgc= BGcolor, w= 345)
+		assetFrameName = frameLayout(l= asset, fn= 'fixedWidthFont', cll= 1, bgc= BGcolor, w= 345)
 		BGcolor = rgb_hex(frameBaseColor, 10)
 		dp_makePySideUI(assetFrameName, 'QWidget {font: bold; color: #222222; background-color: %s}' % BGcolor)
 
 		# asset ui parent formLayout
 		formName = formLayout()
 
-		# huge shot index
+		# huge asset capital
 		titleRow = rowLayout(nc= 2, adj= 1, rat= [2, 'bottom', 4])
 		titleName1 = text(l= asset[0].title(), al= 'right')
 		dp_makePySideUI(titleName1, 'QObject {font: Bold 70px Courier; color: #' + '252525' + ';}')
@@ -587,37 +648,89 @@ def mkAssetListBtn(windowName):
 		dp_makePySideUI(titleName2, 'QObject {font: Bold 55px Courier; color: #' + '252525' + ';}')
 		setParent('..')
 
-		# SHD info extract
-		date_SHD = gcLog['asset'][asset]['SHD'].keys() if gcLog['asset'].has_key(asset) else []
-		date_SHD.sort()
-		dateShortSHD = shortDateFormat(date_SHD[-1]) if date_SHD and date_SHD[-1] else ''
-		filePath_SHD = gcLog['asset'][asset]['SHD'][date_SHD[-1]] if dateShortSHD else ''
-		fileName_SHD = os.path.basename(filePath_SHD) if dateShortSHD else ''
-		sceneName_SHD = os.path.splitext(fileName_SHD)[0] if dateShortSHD else ''
+		# MODm info extract
+		date_MODm = gcLog['asset'][asset]['MOD']['MST'].keys() if gcLog['asset'].has_key(asset) else []
+		date_MODm.sort()
+		dateShortMODm = shortDateFormat(date_MODm[-1]) if date_MODm and date_MODm[-1] else ''
+		filePath_MODm = gcLog['asset'][asset]['MOD']['MST'][date_MODm[-1]] if dateShortMODm else ''
+		fileName_MODm = os.path.basename(filePath_MODm) if dateShortMODm else ''
+		sceneName_MODm = os.path.splitext(fileName_MODm)[0] if dateShortMODm else ''
 
-		# RIG info extract
-		date_RIG = gcLog['asset'][asset]['RIG'].keys() if gcLog['asset'].has_key(asset) else []
-		date_RIG.sort()
-		dateShortRIG = shortDateFormat(date_RIG[-1]) if date_RIG and date_RIG[-1] else ''
-		filePath_RIG = gcLog['asset'][asset]['RIG'][date_RIG[-1]] if dateShortRIG else ''
-		fileName_RIG = os.path.basename(filePath_RIG) if dateShortRIG else ''
-		sceneName_RIG = os.path.splitext(fileName_RIG)[0] if dateShortRIG else ''
+		# MODw info extract
+		date_MODw = gcLog['asset'][asset]['MOD']['WIP'].keys() if gcLog['asset'].has_key(asset) else []
+		date_MODw.sort()
+		dateShortMODw = shortDateFormat(date_MODw[-1]) if date_MODw and date_MODw[-1] else ''
+		filePath_MODw = gcLog['asset'][asset]['MOD']['WIP'][date_MODw[-1]] if dateShortMODw else ''
+		fileName_MODw = os.path.basename(filePath_MODw) if dateShortMODw else ''
+		sceneName_MODw = os.path.splitext(fileName_MODw)[0] if dateShortMODw else ''
+
+		# SHDm info extract
+		date_SHDm = gcLog['asset'][asset]['SHD']['MST'].keys() if gcLog['asset'].has_key(asset) else []
+		date_SHDm.sort()
+		dateShortSHDm = shortDateFormat(date_SHDm[-1]) if date_SHDm and date_SHDm[-1] else ''
+		filePath_SHDm = gcLog['asset'][asset]['SHD']['MST'][date_SHDm[-1]] if dateShortSHDm else ''
+		fileName_SHDm = os.path.basename(filePath_SHDm) if dateShortSHDm else ''
+		sceneName_SHDm = os.path.splitext(fileName_SHDm)[0] if dateShortSHDm else ''
+
+		# SHDw info extract
+		date_SHDw = gcLog['asset'][asset]['SHD']['WIP'].keys() if gcLog['asset'].has_key(asset) else []
+		date_SHDw.sort()
+		dateShortSHDw = shortDateFormat(date_SHDw[-1]) if date_SHDw and date_SHDw[-1] else ''
+		filePath_SHDw = gcLog['asset'][asset]['SHD']['WIP'][date_SHDw[-1]] if dateShortSHDw else ''
+		fileName_SHDw = os.path.basename(filePath_SHDw) if dateShortSHDw else ''
+		sceneName_SHDw = os.path.splitext(fileName_SHDw)[0] if dateShortSHDw else ''
+
+		# RIGm info extract
+		date_RIGm = gcLog['asset'][asset]['RIG']['MST'].keys() if gcLog['asset'].has_key(asset) else []
+		date_RIGm.sort()
+		dateShortRIGm = shortDateFormat(date_RIGm[-1]) if date_RIGm and date_RIGm[-1] else ''
+		filePath_RIGm = gcLog['asset'][asset]['RIG']['MST'][date_RIGm[-1]] if dateShortRIGm else ''
+		fileName_RIGm = os.path.basename(filePath_RIGm) if dateShortRIGm else ''
+		sceneName_RIGm = os.path.splitext(fileName_RIGm)[0] if dateShortRIGm else ''
+
+		# RIGw info extract
+		date_RIGw = gcLog['asset'][asset]['RIG']['WIP'].keys() if gcLog['asset'].has_key(asset) else []
+		date_RIGw.sort()
+		dateShortRIGw = shortDateFormat(date_RIGw[-1]) if date_RIGw and date_RIGw[-1] else ''
+		filePath_RIGw = gcLog['asset'][asset]['RIG']['WIP'][date_RIGw[-1]] if dateShortRIGw else ''
+		fileName_RIGw = os.path.basename(filePath_RIGw) if dateShortRIGw else ''
+		sceneName_RIGw = os.path.splitext(fileName_RIGw)[0] if dateShortRIGw else ''
 
 		columName = columnLayout(adj= 1)
 
-		rowLayout(nc= 3, adj= 1)
-		txt_SHD = text(l= dateShortSHD, al= 'center', w= 105)
-		txt_RIG = text(l= dateShortRIG, al= 'center', w= 105)
+		rowLayout(nc= 4, adj= 1)
+		txt_MODm = text(l= dateShortMODm, al= 'center', w= 70)
+		txt_SHDm = text(l= dateShortSHDm, al= 'center', w= 70)
+		txt_RIGm = text(l= dateShortRIGm, al= 'center', w= 70)
 		text(l= '', w= 3)
 		setParent('..')
 		
-		rowLayout(nc= 3, adj= 1)
-		btn_SHD = button(l= 'SHD', w= 105, h= 30, ann= fileName_SHD, c= partial(btncmd_SHD, filePath_SHD))
-		btn_RIG = button(l= 'RIG', w= 105, h= 30, ann= fileName_RIG, c= partial(btncmd_RIG, filePath_RIG))
-		dp_makePySideUI(btn_SHD, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
-		dp_makePySideUI(btn_RIG, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		rowLayout(nc= 4, adj= 1)
+		btn_MODm = button(l= 'MOD', w= 70, h= 30, ann= fileName_MODm, c= partial(btncmd_AST, filePath_MODm))
+		btn_SHDm = button(l= 'SHD', w= 70, h= 30, ann= fileName_SHDm, c= partial(btncmd_AST, filePath_SHDm))
+		btn_RIGm = button(l= 'RIG', w= 70, h= 30, ann= fileName_RIGm, c= partial(btncmd_AST, filePath_RIGm))
+		dp_makePySideUI(btn_SHDm, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		dp_makePySideUI(btn_RIGm, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
 		text(l= '', w= 3)
 		setParent('..')
+
+		rowLayout(nc= 4, adj= 1)
+		txt_MODw = text(l= dateShortMODw, al= 'center', w= 70)
+		txt_SHDw = text(l= dateShortSHDw, al= 'center', w= 70)
+		txt_RIGw = text(l= dateShortRIGw, al= 'center', w= 70)
+		text(l= '', w= 3)
+		setParent('..')
+		
+		rowLayout(nc= 4, adj= 1)
+		btn_MODw = button(l= 'MOD_wip', w= 70, h= 30, ann= fileName_MODw, c= partial(btncmd_AST, filePath_MODw))
+		btn_SHDw = button(l= 'SHD_wip', w= 70, h= 30, ann= fileName_SHDw, c= partial(btncmd_AST, filePath_SHDw))
+		btn_RIGw = button(l= 'RIG_wip', w= 70, h= 30, ann= fileName_RIGw, c= partial(btncmd_AST, filePath_RIGw))
+		dp_makePySideUI(btn_SHDw, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		dp_makePySideUI(btn_RIGw, 'QPushButton {background-color: %s}' % (rgb_hex(colorA, 0)))
+		text(l= '', w= 3)
+		setParent('..')
+
+		text(l= '', h= 6)
 
 		setParent('..')
 		setParent('..')
@@ -628,32 +741,83 @@ def mkAssetListBtn(windowName):
 
 		colorHide = rgb_hex(colorA, -15)
 		colorGray = rgb_hex(colorA, 0)
-		# check SHD
-		if not os.path.exists(filePath_SHD):
-			button(btn_SHD, e= 1, en= 0)
-			dp_makePySideUI(btn_SHD, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		# check MODm
+		if not os.path.exists(filePath_MODm):
+			button(btn_MODm, e= 1, en= 0)
+			dp_makePySideUI(btn_MODm, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		# check MODw
+		if not os.path.exists(filePath_MODw):
+			button(btn_MODw, e= 1, en= 0)
+			dp_makePySideUI(btn_MODw, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
 		else:
-			ver = sInfo.getVerSN(sceneName_SHD)
-			button(btn_SHD, e= 1, l= 'SHD' + (('_' + ver) if ver else ''))
-		# check RIG
-		if not os.path.exists(filePath_RIG):
-			button(btn_RIG, e= 1, en= 0)
-			dp_makePySideUI(btn_RIG, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+			ver = sInfo.getVerSN(sceneName_MODw)
+			button(btn_MODw, e= 1, l= 'MOD' + (('_' + ver) if ver else ''))
+		# check SHDm
+		if not os.path.exists(filePath_SHDm):
+			button(btn_SHDm, e= 1, en= 0)
+			dp_makePySideUI(btn_SHDm, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		# check SHDw
+		if not os.path.exists(filePath_SHDw):
+			button(btn_SHDw, e= 1, en= 0)
+			dp_makePySideUI(btn_SHDw, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
 		else:
-			ver = sInfo.getVerSN(sceneName_RIG)
-			button(btn_RIG, e= 1, l= 'RIG' + (('_' + ver) if ver else ''))
+			ver = sInfo.getVerSN(sceneName_SHDw)
+			button(btn_SHDw, e= 1, l= 'SHD' + (('_' + ver) if ver else ''))
+		# check RIGm
+		if not os.path.exists(filePath_RIGm):
+			button(btn_RIGm, e= 1, en= 0)
+			dp_makePySideUI(btn_RIGm, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		# check RIGw
+		if not os.path.exists(filePath_RIGw):
+			button(btn_RIGw, e= 1, en= 0)
+			dp_makePySideUI(btn_RIGw, 'QPushButton {color: %s; background-color: %s}' % (colorGray, colorHide))
+		else:
+			ver = sInfo.getVerSN(sceneName_RIGw)
+			button(btn_RIGw, e= 1, l= 'RIG' + (('_' + ver) if ver else ''))
 
 
 		# check update
-		if date_SHD and date_SHD[-1] >= userHistory[workRoot]:
-			dp_makePySideUI(txt_SHD, 'QObject {font: bold; color: #E3C55E}')
-			dp_makePySideUI(btn_SHD, 'QPushButton {background-color: #E3C55E}')
-		if date_RIG and date_RIG[-1] >= userHistory[workRoot]:
-			dp_makePySideUI(txt_RIG, 'QObject {font: bold; color: #E3C55E}')
-			dp_makePySideUI(btn_RIG, 'QPushButton {background-color: #E3C55E}')
+		if date_MODm and date_MODm[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_MODm, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_MODm, 'QPushButton {background-color: #E3C55E}')
+		if date_MODw and date_MODw[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_MODw, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_MODw, 'QPushButton {background-color: #E3C55E}')
+		if date_SHDm and date_SHDm[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_SHDm, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_SHDm, 'QPushButton {background-color: #E3C55E}')
+		if date_SHDw and date_SHDw[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_SHDw, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_SHDw, 'QPushButton {background-color: #E3C55E}')
+		if date_RIGm and date_RIGm[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_RIGm, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_RIGm, 'QPushButton {background-color: #E3C55E}')
+		if date_RIGw and date_RIGw[-1] >= userHistory[workRoot]:
+			dp_makePySideUI(txt_RIGw, 'QObject {font: bold; color: #E3C55E}')
+			dp_makePySideUI(btn_RIGw, 'QPushButton {background-color: #E3C55E}')
 
 
-def mkShotListBtn(windowName):
+def mkShotListBtn(windowName, shotColumn):
+
+	def expandCollapseFrames(btnExpCol, *args):
+		if button(btnExpCol, q= 1, l= 1) == 'Expand All':
+			cmd = 0
+			button(btnExpCol, e= 1, l= 'Collapse All')
+		else:
+			cmd = 1
+			button(btnExpCol, e= 1, l= 'Expand All')
+		for ui in columnLayout(shotColumn, q= 1, ca= 1):
+			if objectTypeUI(ui) == 'frameLayout':
+				label = frameLayout(ui, q= 1, ann= 1)
+				if not cmd:
+					label = ' '.join(label.split(' ')[:2])
+				frameLayout(ui, e= 1, cl= cmd, l= label)
+	text(l= '', h= 1)
+	rowLayout(nc= 2, adj= 1)
+	btnExpCol = button(l= 'Expand All', w= 340)
+	button(btnExpCol, e= 1, c= partial(expandCollapseFrames, btnExpCol))
+	dp_makePySideUI(btnExpCol, 'QPushButton {color: #%s; background-color: #%s}' % ('758095', '454545'))
+	setParent('..')
 
 	sInfo = _getSceneInfo()
 	userHistory = getUserHistory()
@@ -668,13 +832,26 @@ def mkShotListBtn(windowName):
 
 	for shot in shotList:
 		
+		# shot info extract
 		shotNum = shot[:shotPadding]
+		s_fps = gcLog['shots'][shot]['INF']['fps']
+		s_fps = str(int(s_fps) if s_fps.is_integer()  else s_fps)
+		s_min = str(int(gcLog['shots'][shot]['INF']['min']))
+		s_max = str(int(gcLog['shots'][shot]['INF']['max']))
 
 		colorA = hex_rgb('505050')
 
 		# shot frameLayout
 		BGcolor = rgb_nor(frameBaseColor)
-		shotFrameName = frameLayout(l= 'shot ' + shot, cll= 1, bgc= BGcolor, w= 345)
+		s = 'shot ' + shot
+		f = s_fps + ' fps'
+		ccShotLable = s + ' '*(9-len(s)) + ' '*(4-len(s_fps)) + f + ' '*4 + s_min + ' - ' + s_max
+		ecShotLable = s
+		shotFrameName = frameLayout(l= ccShotLable, ann= ccShotLable,
+			fn= 'fixedWidthFont', cll= 1, cl= 1, bgc= BGcolor, w= 345)
+		frameLayout(shotFrameName, e= 1,
+			cc= 'cmds.frameLayout("' + shotFrameName + '", e= 1, l= "' + ccShotLable + '")',
+			ec= 'cmds.frameLayout("' + shotFrameName + '", e= 1, l= "shot ' + shot + '")')
 		BGcolor = rgb_hex(frameBaseColor, 10)
 		dp_makePySideUI(shotFrameName, 'QWidget {font: bold; color: #222222; background-color: %s}' % BGcolor)
 
@@ -684,6 +861,20 @@ def mkShotListBtn(windowName):
 		# huge shot index
 		titleName = text(l= shotNum, al= 'right')
 		dp_makePySideUI(titleName, 'QObject {font: bold 100px Arial; color: #' + '252525' + ';}')
+		# huge fps
+		frameRate = formLayout()
+		fpsText = text(l= s_fps, al= 'right')
+		dp_makePySideUI(fpsText, 'QObject {font: bold 16px Arial; color: #' + '959595' + ';}')
+		fpsUnit = text(l= 'FPS', al= 'left')
+		dp_makePySideUI(fpsUnit, 'QObject {font: bold 10px Arial; color: #' + '959595' + ';}')
+		setParent('..')
+		formLayout(frameRate, e= 1, af=[(fpsText, 'left',   0), (fpsText, 'bottom', 0)])
+		formLayout(frameRate, e= 1, af=[(fpsUnit, 'bottom', 3)])
+		formLayout(frameRate, e= 1, ac=[(fpsUnit, 'left', 4, fpsText)])
+		# huge frame range
+		frameRang = text(l= s_min + ' - ' + s_max)
+		dp_makePySideUI(frameRang, 'QObject {font: bold 11px Arial; color: #' + '959595' + ';}')
+		
 		
 		columName = columnLayout(adj= 1, w= 120)
 
@@ -692,6 +883,8 @@ def mkShotListBtn(windowName):
 		date_ANI.sort()
 		dateShortANI = shortDateFormat(date_ANI[-1]) if date_ANI[-1] else ''
 		filePath_ANI = gcLog['shots'][shot]['ANI'][date_ANI[-1]]
+		#author_ANI =
+		#station_ANI =
 		fileName_ANI = os.path.basename(filePath_ANI)
 		sceneName_ANI = os.path.splitext(fileName_ANI)[0]
 
@@ -706,8 +899,12 @@ def mkShotListBtn(windowName):
 
 		# shot buttons
 		columnLayout(adj= 1)
-		rowLayout(nc= 2, adj= 1)
-		text(l= '', h= 8, w= 120)
+		rowLayout(nc= 3, adj= 2)
+		#text(l= '', h= 8, w= 85)
+		ecAssetBtn = button(l= '+', h= 14, w= 14)
+		dp_makePySideUI(ecAssetBtn, 
+			'QPushButton {font: bold 14px Arial; background-color: #%s; color: #%s}' % ('5A5A5A', '222222'))
+		text(l= '', h= 8, w= 136)
 		delShotBtn = button(l= 'X', h= 14, w= 14, c= partial(btncmd_delShot, shotNum))
 		dp_makePySideUI(delShotBtn, 'QPushButton {background-color: #%s; color: #%s}' % ('624249', '9F9F9F'))
 		setParent('..')
@@ -765,30 +962,32 @@ def mkShotListBtn(windowName):
 		if date_ANI and date_ANI[-1] >= userHistory[workRoot]:
 			dp_makePySideUI(txt_ANI, 'QObject {font: bold; color: #E3C55E}')
 			dp_makePySideUI(btn_ANI, 'QPushButton {background-color: #E3C55E}')
+			frameLayout(shotFrameName, e= 1, cl= 0, l= ecShotLable, bgc= rgb_nor(hex_rgb('E3C55E')))
 		if date_CAM and date_CAM[-1] >= userHistory[workRoot]:
 			dp_makePySideUI(txt_CAM, 'QObject {font: bold; color: #E3C55E}')
 			dp_makePySideUI(btn_CAM, 'QPushButton {background-color: #E3C55E}')
+			frameLayout(shotFrameName, e= 1, cl= 0, l= ecShotLable, bgc= rgb_nor(hex_rgb('E3C55E')))
 
 
-		assetList = gcLog['asset'].keys()
-
+		# build asset frameLayouts
+		shotFrameName_asset_Dict = {}
 		shot_assetList = gcLog['shots'][shot]['GEO'].keys()
 		shot_assetList.sort()
 		for num, asset in enumerate(shot_assetList):
 
 			# SHD info extract
-			date_SHD = gcLog['asset'][asset]['SHD'].keys() if gcLog['asset'].has_key(asset) else []
+			date_SHD = gcLog['asset'][asset]['SHD']['MST'].keys() if gcLog['asset'].has_key(asset) else []
 			date_SHD.sort()
 			dateShortSHD = shortDateFormat(date_SHD[-1]) if date_SHD and date_SHD[-1] else ''
-			filePath_SHD = gcLog['asset'][asset]['SHD'][date_SHD[-1]] if dateShortSHD else ''
+			filePath_SHD = gcLog['asset'][asset]['SHD']['MST'][date_SHD[-1]] if dateShortSHD else ''
 			fileName_SHD = os.path.basename(filePath_SHD) if dateShortSHD else ''
 			sceneName_SHD = os.path.splitext(fileName_SHD)[0] if dateShortSHD else ''
 
 			# RIG info extract
-			date_RIG = gcLog['asset'][asset]['RIG'].keys() if gcLog['asset'].has_key(asset) else []
+			date_RIG = gcLog['asset'][asset]['RIG']['MST'].keys() if gcLog['asset'].has_key(asset) else []
 			date_RIG.sort()
 			dateShortRIG = shortDateFormat(date_RIG[-1]) if date_RIG and date_RIG[-1] else ''
-			filePath_RIG = gcLog['asset'][asset]['RIG'][date_RIG[-1]] if dateShortRIG else ''
+			filePath_RIG = gcLog['asset'][asset]['RIG']['MST'][date_RIG[-1]] if dateShortRIG else ''
 			fileName_RIG = os.path.basename(filePath_RIG) if dateShortRIG else ''
 			sceneName_RIG = os.path.splitext(fileName_RIG)[0] if dateShortRIG else ''
 			
@@ -801,9 +1000,12 @@ def mkShotListBtn(windowName):
 			sceneName_GEO = os.path.splitext(fileName_GEO)[0] if dateShortGEO else ''
 			geoCacheDir = moGeoCache.getGeoCacheDir(asset, sceneName_GEO) if dateShortGEO else ''
 
-			rowLayout(nc= 2, adj= 1)
-			shotFrameName_asset = frameLayout(l= asset, cll= 0, bgc= rgb_nor(hex_rgb('686868')))
+			astRow = rowLayout(nc= 2, adj= 1, h= 24)
+			shotFrameName_asset = frameLayout(l= asset, cll= 1, cl= 1, bgc= rgb_nor(hex_rgb('686868')),
+				cc= 'cmds.rowLayout("' + astRow + '", e= 1, h= 24)',
+				ec= 'cmds.rowLayout("' + astRow + '", e= 1, h= 69)')
 			dp_makePySideUI(shotFrameName_asset, 'QWidget {color: #222222; background-color: #606060}')
+			
 			columnLayout(adj= 1)
 
 			rowLayout(nc= 3, adj= 1)
@@ -878,19 +1080,45 @@ def mkShotListBtn(windowName):
 				button(btn_GEO, e= 1, l= 'GEO' + (('_' + ver) if ver else ''))
 
 			# check update
+			hasUpdate = 0
 			if date_SHD and date_SHD[-1] >= userHistory[workRoot]:
 				dp_makePySideUI(txt_SHD, 'QObject {font: bold; color: #E3C55E}')
 				dp_makePySideUI(btn_SHD, 'QPushButton {background-color: #E3C55E}')
+				hasUpdate = 1
 			if date_RIG and date_RIG[-1] >= userHistory[workRoot]:
 				dp_makePySideUI(txt_RIG, 'QObject {font: bold; color: #E3C55E}')
 				dp_makePySideUI(btn_RIG, 'QPushButton {background-color: #E3C55E}')
+				hasUpdate = 1
 			if date_GEO and date_GEO[-1] >= userHistory[workRoot]:
 				dp_makePySideUI(txt_GEO, 'QObject {font: bold; color: #E3C55E}')
 				dp_makePySideUI(btn_GEO, 'QPushButton {background-color: #E3C55E}')
+				hasUpdate = 1
+			if hasUpdate:
+				frameLayout(shotFrameName, e= 1, cl= 0, l= ecShotLable, bgc= rgb_nor(hex_rgb('E3C55E')))
+				rowLayout(astRow, e= 1, h= 69)
+				frameLayout(shotFrameName_asset, e= 1, cl= 0, bgc= rgb_nor(hex_rgb('E3C55E')))
+
+			shotFrameName_asset_Dict[astRow] = shotFrameName_asset
+
+		def ecAssetBtn_do(ecAssetBtn, shotFrameName_asset_Dict, *args):
+			if button(ecAssetBtn, q= 1, l= 1) == '+':
+				cmd = 0
+				h = 69
+				button(ecAssetBtn, e= 1, l= '-')
+			else:
+				cmd = 1
+				h = 24
+				button(ecAssetBtn, e= 1, l= '+')
+			for row in shotFrameName_asset_Dict.keys():
+				frameLayout(shotFrameName_asset_Dict[row], e= 1, cl= cmd)
+				rowLayout(row, e= 1, h= h)
+		button(ecAssetBtn, e= 1, c= partial(ecAssetBtn_do, ecAssetBtn, shotFrameName_asset_Dict))
 
 
 		formLayout(formName, e= 1, af=[(titleName, 'left', -20), (titleName, 'top', -25)])
-		formLayout(formName, e= 1, af=[(columName, 'right', 0), (columName, 'top', 0), (columName, 'left', 120)])
+		formLayout(formName, e= 1, af=[(frameRate, 'left',   4), (frameRate, 'top',  74)])
+		formLayout(formName, e= 1, af=[(frameRang, 'left',  10), (frameRang, 'top',  92)])
+		formLayout(formName, e= 1, af=[(columName, 'right',  0), (columName, 'top', 0), (columName, 'left', 120)])
 
 		setParent('..')
 		setParent('..')
@@ -900,7 +1128,7 @@ def mkShotListBtn(windowName):
 
 def ui_geoCacheIO():
 
-	windowName = 'mo_geoCacheIO'
+	windowName = 'msMayaHub'
 
 	sInfo = _getSceneInfo()
 	userHistory = getUserHistory()
@@ -917,10 +1145,12 @@ def ui_geoCacheIO():
 	
 	staticArea = columnLayout(adj= 1, rs= 5)
 	if True:
-		rowLayout(nc= 2, adj= 3)
+		rowLayout(nc= 3, adj= 3)
 		if True:
 			btnPrj = button(l= 'Set Project', h= 23, w= 250, bgc= [.25, .25, .25], c= ui_setProject)
 			btnREF = button(l= 'Refresh', h= 23, w= 100, bgc= [.21, .21, .21], c= renewUI)
+			image(h= 23,
+				i= 'T:/MoonShineDesign/MS_Corporate/Logo/LogoTextBlack_NoOpacity_tiny.png')
 			setParent('..')
 	
 
@@ -937,10 +1167,11 @@ def ui_geoCacheIO():
 			pushtext = text(l= 'PUSH  `submit / output', al= 'left', h= 20)
 			columnLayout(adj= 1, bgc= ctrBaseColor)
 			if True:
-				rowLayout(nc= 2, adj= 1)
+				rowLayout(nc= 3, adj= 1)
 				if True:
-					btnSHD = button(l= 'SHD', h= 30, w= 180, bgc= ctrSubsColor, c= submitSHD)
-					btnRIG = button(l= 'RIG', h= 30, w= 180, bgc= ctrSubsColor, c= submitRIG)
+					btnMOD = button(l= 'MOD', h= 37, w= 120, bgc= ctrSubsColor, c= submitMOD)
+					btnSHD = button(l= 'SHD', h= 37, w= 120, bgc= ctrSubsColor, c= submitSHD)
+					btnRIG = button(l= 'RIG', h= 37, w= 120, bgc= ctrSubsColor, c= submitRIG)
 					setParent('..')
 				rowLayout(nc= 7)
 				if True:
@@ -975,9 +1206,9 @@ def ui_geoCacheIO():
 				rowLayout(nc= 3, adj= 3)
 				if True:
 					btnPushName = windowName + '_button_' + 'submit'
-					button(btnPushName + 'ANI', l= 'ANI', h= 44, w= 120, bgc= ctrSubsColor, c= submitANI)
-					button(btnPushName + 'CAM', l= 'CAM', h= 44, w= 120, bgc= ctrSubsColor, c= submitCAM)
-					button(btnPushName + 'GEO', l= 'GEO', h= 44, w= 120, bgc= ctrSubsColor, c= submitGEO)
+					button(btnPushName + 'ANI', l= 'ANI', h= 37, w= 120, bgc= ctrSubsColor, c= submitANI)
+					button(btnPushName + 'CAM', l= 'CAM', h= 37, w= 120, bgc= ctrSubsColor, c= submitCAM)
+					button(btnPushName + 'GEO', l= 'GEO', h= 37, w= 120, bgc= ctrSubsColor, c= submitGEO)
 					setParent('..')
 				setParent('..')
 			text(l= '', h= 1)
@@ -991,13 +1222,13 @@ def ui_geoCacheIO():
 			if True:
 				shotColumn = columnLayout(rs= 5)
 				if True:
-					mkShotListBtn(windowName)
+					mkShotListBtn(windowName, shotColumn)
 					setParent('..')
 				tabLayout(pullTab, e= 1, tabLabel= [shotColumn, '    S H O T S    '])
 
 				assetColumn = columnLayout(rs= 5)
 				if True:
-					mkAssetListBtn(windowName)
+					mkAssetListBtn(windowName, assetColumn)
 					setParent('..')
 				tabLayout(pullTab, e= 1, tabLabel= [assetColumn, '    A S S E T    '])
 
@@ -1020,8 +1251,9 @@ def ui_geoCacheIO():
 	dp_makePySideUI(btnREF, 'QPushButton {font: 14px Courier; color: #407043;}')
 	dp_makePySideUI(projtext, 'QObject {font: bold 32px; color: #222222; font-family: Arial;}')
 	dp_makePySideUI(pushtext, 'QObject {font: bold 20px; font-family: Arial; color: #3C3C3C;}')
-	dp_makePySideUI(btnSHD, 'QPushButton {font: 20px Courier; color: #8C7B3D;}')
-	dp_makePySideUI(btnRIG, 'QPushButton {font: 20px Courier; color: #8C7B3D;}')
+	dp_makePySideUI(btnMOD, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
+	dp_makePySideUI(btnSHD, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
+	dp_makePySideUI(btnRIG, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
 	dp_makePySideUI(tex_com, 'QObject {color: #AAAAAA;}')
 	dp_makePySideUI(tex_pgeo, 'QObject {color: #AAAAAA;}')
 	dp_makePySideUI('cBox_isPartial', 'QObject {color: #AAAAAA; background-color: #252525;}')
@@ -1037,9 +1269,9 @@ def ui_geoCacheIO():
 	dp_makePySideUI('cBox_ignorDupl', 'QObject {color: #AAAAAA; background-color: #252525;}')
 	dp_makePySideUI(txt_filt, 'QObject {color: #AAAAAA;}')
 	dp_makePySideUI('textF_filter', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	dp_makePySideUI(btnPushName + 'ANI', 'QPushButton {font: 28px Courier; color: #9D344C;}')
-	dp_makePySideUI(btnPushName + 'CAM', 'QPushButton {font: 28px Courier; color: #9D344C;}')
-	dp_makePySideUI(btnPushName + 'GEO', 'QPushButton {font: 28px Courier; color: #AAAAAA;}')
+	dp_makePySideUI(btnPushName + 'ANI', 'QPushButton {font: 24px Courier; color: #9D344C;}')
+	dp_makePySideUI(btnPushName + 'CAM', 'QPushButton {font: 24px Courier; color: #9D344C;}')
+	dp_makePySideUI(btnPushName + 'GEO', 'QPushButton {font: 24px Courier; color: #AAAAAA;}')
 	dp_makePySideUI(pulltext, 'QObject {font: bold 20px; font-family: Arial; color: #3C3C3C;}')
 
 	dockControl(windowName, area= 'right', content= main_window, allowedArea= ['right', 'left'], vis= 1, s= 0, w= 380)

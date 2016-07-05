@@ -29,6 +29,12 @@ def rViskeyNS():
 	return ':moGeoCacheViskey'
 
 
+def rRigkeyNS():
+	"""
+	"""
+	return ':moGeoCacheRigkey'
+
+
 def rGeoFileType():
 	"""
 	"""
@@ -124,7 +130,16 @@ def rViskeyFilePath(geoCacheDir, assetName, visAniNode):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-	filePath = geoCacheDir + sInfo.sep + assetName + '@' + visAniNode.split(':')[-1] + '.ma'
+	filePath = geoCacheDir + sInfo.sep + assetName + '@' + visAniNode.split(':')[-1] + '_visKeys.ma'
+
+	return filePath
+
+
+def rRigkeyFilePath(geoCacheDir, assetName):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+	filePath = geoCacheDir + sInfo.sep + assetName + '_rigCtrls.ma'
 
 	return filePath
 
