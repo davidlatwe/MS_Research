@@ -458,16 +458,18 @@ def mImportTimeInfo(timeInfoFile):
 def mGetSmoothMask(assetName):
 	"""
 	"""
-	meshSmoothmask = []
+	smoothmask = []
+	smoothInclusive = False
 	setList = cmds.ls('*moGeoCacheSmoothMask', r= 1, typ= 'objectSet')
 	if setList:
 		for set in setList:
 			if ':' not in set or (':' in set and set.startswith(assetName)):
 				for obj in cmds.sets(set, q= 1, no= 1):
-					meshSmoothmask.append(obj.split(':')[-1])
+					smoothmask.append(obj.split(':')[-1])
+				smoothInclusive = True if cmds.getAttr(set + '.smoothInclusive') else False
 				break
 				
-	return meshSmoothmask
+	return smoothInclusive, smoothmask
 
 
 def mGetRigCtrlExportList(assetName):

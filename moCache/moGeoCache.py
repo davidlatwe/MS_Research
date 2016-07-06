@@ -41,7 +41,7 @@ def getGeoCacheDir(assetName, sceneName):
 	return moRules.rGeoCacheDir(assetName, sceneName)
 
 
-def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None, sceneName_override= None, smoothInclusive= None):
+def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName_override= None, sceneName_override= None):
 	"""
 	輸出 geoCache
 	"""
@@ -98,9 +98,8 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
 		geoCacheDir = getGeoCacheDir(assetName, sceneName_override)
 		geoFileType = moRules.rGeoFileType()
-		excludeList = moMethod.mGetSmoothMask(assetName)
+		smoothInclusive, smoothMask = moMethod.mGetSmoothMask(assetName)
 		rigCtrlList = moMethod.mGetRigCtrlExportList(assetName)
-		smoothInclusive = True if smoothInclusive else False
 
 		logger.info('AssetName: [' + assetName + ']')
 
@@ -176,7 +175,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, assetName_override= None,
 			# subdiv before export
 			if subdivLevel:
 				for ves in cmds.listRelatives(ves_grp, c= 1):
-					if ((ves.split(':')[-1] not in excludeList) + smoothInclusive) % 2:
+					if ((ves.split(':')[-1] not in smoothMask) + smoothInclusive) % 2:
 						moMethod.mSmoothMesh(ves, subdivLevel)
 			# write out transform node's name
 			for ves in cmds.listRelatives(ves_grp, c= 1):
