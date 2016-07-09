@@ -7,6 +7,7 @@ Created on 2016.07.06
 from pymel.core import *
 from functools import partial
 import moCache.moGeoCache as moGeoCache; reload(moGeoCache)
+import os
 
 
 
@@ -46,6 +47,8 @@ def exec_getParams(*args):
 def exec_checkParam(paramDict):
 	"""
 	"""
+	for param in paramDict:
+		print param.rjust(10) + ' : ' + str(paramDict[param])
 	return True
 
 	
@@ -53,7 +56,7 @@ def exec_Export(actionType, paramDict):
 	"""
 	"""
 	if actionType == 1:
-		print paramDict
+		pass
 	if actionType == 2:
 		pass
 	if actionType == 3:
@@ -70,7 +73,7 @@ def exec_Import(actionType, paramDict):
 	"""
 	"""
 	if actionType == 1:
-		print paramDict
+		pass
 	if actionType == 2:
 		pass
 	if actionType == 3:
@@ -100,8 +103,13 @@ def ui_getSceneName():
 	"""
 	"""
 	if not textField(textF_sceneName, q= 1, tx= 1):
-		sname = system.sceneName().namebase
-		text(txt_infoSceneName, e= 1, l= sname)
+		if radioButtonGrp(rbtn_geoIO, q= 1, sl= 1) == 1:
+			sname = system.sceneName().namebase
+			text(txt_infoSceneName, e= 1, l= sname)
+		else:
+			text(txt_infoSceneName, e= 1, l= '')
+	else:
+		text(txt_infoSceneName, e= 1, l= textField(textF_sceneName, q= 1, tx= 1))
 
 
 def ui_initPrep(sideValue):
@@ -286,10 +294,11 @@ def ui_geoCache(midValue):
 				tex_com = text(l= 'Import', al= 'center', fn= 'boldLabelFont', w= 40, en= en)
 				separator(h= 10, st= 'double', en= 0)
 				setParent('..')
-			rowLayout(nc= 2, adj= 2)
+			rowLayout(nc= 3, adj= 3)
 			if True:
-				txt_choose = text('Choose Scene ', al= 'right', w= midValue, en= en)
-				menu_choose = optionMenu(l= '', en= en)
+				txt_choose = text('', al= 'right', w= midValue - 20, en= en)
+				icBtn_textF_choose = iconTextButton(i= 'fileOpen.png', w= 20, h= 20, en= en)
+				textF_choose = textField(pht= 'scene geoCacheDir', en= en)
 				setParent('..')
 			rowLayout(nc= 2, adj= 2)
 			if True:
@@ -342,10 +351,10 @@ def ui_geoCache(midValue):
 		layout(col, e= 1, vis= vis)
 		if col == col_exp and vis:
 			checkBox(cBox_isPartial, e= 1, l= 'Partial Export')
-			#window(windowName, e= 1, h= 604)
+			ui_getSceneName()
 		if col == col_imp and vis:
 			checkBox(cBox_isPartial, e= 1, l= 'Partial Import')
-			#window(windowName, e= 1, h= 623)
+			text(txt_infoSceneName, e= 1, l= textField(textF_choose, q= 1, tx= 1))
 
 	radioButtonGrp(rbtn_geoIO, e= 1,
 			of1= partial(geoCacheIOctrlSwitch, col_exp, 0),
@@ -365,8 +374,31 @@ def ui_geoCache(midValue):
 
 	textField(textF_assetName, e= 1, cc= partial(textFieldSync, textF_assetName, txt_infoAssetName))
 	textField(textF_sceneName, e= 1, cc= partial(textFieldSync, textF_sceneName, txt_infoSceneName))
+	textField(textF_choose, e= 1, cc= partial(textFieldSync, textF_choose, txt_infoSceneName))
 
-	geoCacheRoot = workspace(q= 1, rd= 1) + workspace('moGeoCache', q= 1, fre= 1)
+	def openCacheFolder(*args):
+		assetName = text(txt_infoAssetName, q= 1, l= 1)
+		msg = ''
+		if assetName:
+			geoCacheRoot = workspace(q= 1, rd= 1) + workspace('moGeoCache', q= 1, fre= 1)
+			geoCacheDir = geoCacheRoot + '/' + assetName
+			if os.path.exists(geoCacheDir):
+				result = fileDialog2(cap= 'geoCache Folder', fm= 3, okc= 'Select', dir= geoCacheDir)
+				if result:
+					folderName = os.path.basename(result[0])
+					if os.path.exists(geoCacheDir + '/' + folderName):
+						textField(textF_choose, e= 1, tx= folderName)
+						text(txt_infoSceneName, e= 1, l= folderName)
+					else:
+						msg = 'This asset dose not have this geoCache folder.'
+			else:
+				msg = 'Asset [ ' + assetName + ' ] dose not exists in the moGeoCache folder.'
+		else:
+			msg = 'Select an Asset first.'
+		if msg:
+			confirmDialog(t= 'Warning', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
+
+	iconTextButton(icBtn_textF_choose, e= 1, c= openCacheFolder)
 
 
 def ui_main():
@@ -378,11 +410,11 @@ def ui_main():
 	if window(windowName, q= 1, ex= 1):
 		deleteUI(windowName)
 
-	window(windowName, t= 'GeoCache Settings', s= 1, mxb= 0, mnb= 0)
+	window(windowName, t= 'GeoCache Settings', s= 0, mxb= 0, mnb= 0)
 	main_column = columnLayout(adj= 1)
 	# geoCache
 	ui_initPrep(50)
-	ui_geoCache(100)
+	ui_geoCache(90)
 	setParent('..')
 
 	scriptJob(e= ['SelectionChanged', ui_getAssetName], p= windowName)
@@ -391,5 +423,5 @@ def ui_main():
 	ui_getSceneName()
 
 	#cmds.window('ms_GeoCache_uiMain', q= 1, h= 1)
-	window(windowName, e= 1, h= 604, w= 254)
+	window(windowName, e= 1, h= 604, w= 270)
 	showWindow(windowName)

@@ -79,7 +79,7 @@ def rWorkspaceRoot():
 	return sInfo.workspaceRoot
 
 
-def rGeoCacheDir(assetName, sceneName= None):
+def rGeoCacheDir(assetName, mustMake, sceneName= None):
 	"""
 	"""
 	sInfo = _getSceneInfo()
@@ -93,6 +93,7 @@ def rGeoCacheDir(assetName, sceneName= None):
 	isMakeDir = False
 	if sceneName is None:
 		sceneName = sInfo.sceneSplitExt
+	if sceneName is None or mustMake:
 		isMakeDir = True
 
 	geoCache_path = sInfo.sep.join([ rootPath, assetName, sceneName ])

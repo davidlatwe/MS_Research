@@ -31,14 +31,14 @@ def getAssetList():
 		assetName = moRules.rAssetName(moRules.rAssetNS(rootNode))
 		assetList.append(assetName)
 	if not assetList:
-		logger.error('assetList is empty as your soul.')
+		logger.warning('assetList is empty as your soul.')
 
 	return assetList
 
 
-def getGeoCacheDir(assetName, sceneName):
+def getGeoCacheDir(assetName, mode, sceneName):
 
-	return moRules.rGeoCacheDir(assetName, sceneName)
+	return moRules.rGeoCacheDir(assetName, mode, sceneName)
 
 
 def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName_override= None, sceneName_override= None):
@@ -52,6 +52,12 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 	viskeyNS = moRules.rViskeyNS()
 	rigkeyNS = moRules.rRigkeyNS()
 	# get playback range
+	playbackRange_keep = moRules.rPlaybackRange()
+	isStatic = True if isStatic else False
+	if isStatic:
+		timelineInfo = moMethod.mSetStaticRange()
+	else:
+		moMethod.mRangePushBack()
 	playbackRange = moRules.rPlaybackRange()
 	# get frame rate
 	timeUnit = moRules.rFrameRate()
@@ -96,7 +102,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 		'''
 		assetNS = moRules.rAssetNS(rootNode)
 		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
-		geoCacheDir = getGeoCacheDir(assetName, sceneName_override)
+		geoCacheDir = getGeoCacheDir(assetName, 1, sceneName_override)
 		geoFileType = moRules.rGeoFileType()
 		smoothInclusive, smoothMask = moMethod.mGetSmoothMask(assetName)
 		rigCtrlList = moMethod.mGetRigCtrlExportList(assetName)
@@ -183,8 +189,10 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 				geoListFile = moRules.rGeoListFilePath(geoCacheDir, assetName, ves, vesShape, geoFileType)
 				moMethod.mSaveGeoList(geoListFile)
 			# export GeoCache
+			logger.info('Asset [' + assetName + '] ready to start caching.')
 			cmds.select(ves_grp, r= 1, hi= 1)
 			moMethod.mExportGeoCache(geoCacheDir, assetName)
+			logger.info('Asset [' + assetName + '] caching process is done.')
 			# remove mGC namespace
 			logger.info('workingNS: <' + workingNS + '> Del.')
 			moMethod.mCleanWorkingNS(workingNS)
@@ -192,15 +200,17 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 			logger.warning('No mesh to cache.')
 
 		# note down frameRate and playback range
-		if isPartial:
-			logger.warning('In PARTIAL mode, No TimeInfo export.')
-		else:
-			timeInfoFile = moRules.rTimeInfoFilePath(geoCacheDir, assetName)
-			moMethod.mExportTimeInfo(timeInfoFile, timeUnit, playbackRange)
-			logger.info('TimeInfo exported.')
+		timeInfoFile = moRules.rTimeInfoFilePath(geoCacheDir, assetName)
+		moMethod.mExportTimeInfo(timeInfoFile, timeUnit, playbackRange_keep, isStatic)
+		logger.info('TimeInfo exported.')
 
 		logger.info('[' + rootNode + '] geoCached.')
 		logger.info(geoCacheDir)
+
+	if isStatic:
+		moMethod.mSetStaticRange(timelineInfo)
+	else:
+		moMethod.mRangePushBack(1)
 
 	logger.info('GeoCache export completed.')
 
@@ -248,13 +258,22 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 		workRoot = moRules.rWorkspaceRoot()
 		assetNS = moRules.rAssetNS(rootNode)
 		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
-		geoCacheDir = getGeoCacheDir(assetName, sceneName)
+		geoCacheDir = getGeoCacheDir(assetName, 0, sceneName)
 		geoFileType = moRules.rGeoFileType()
 		conflictList = [] if conflictList is None else conflictList
+		staticInfo = []
 
 		if not cmds.file(geoCacheDir, q= 1, ex= 1):
 			logger.warning('[' + rootNode + '] geoCacheDir not exists -> ' + geoCacheDir)
 			continue
+
+		# go set frameRate and playback range
+		timeInfoFile = moRules.rTimeInfoFilePath(geoCacheDir, assetName)
+		if cmds.file(timeInfoFile, q= 1, ex= 1):
+			staticInfo = moMethod.mImportTimeInfo(timeInfoFile)
+			logger.info('TimeInfo imported.')
+		else:
+			logger.warning('[' + rootNode + '] TimeInfo not exists.')
 
 		# get transform list from motxt file
 		anim_geoDict = moMethod.mLoadGeoList(geoCacheDir, workingNS, geoFileType)
@@ -269,7 +288,7 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 				xmlFile = moRules.rXMLFilePath(geoCacheDir, moRules.rXMLFileName(assetName, workingNS, anim_shape))
 				if cmds.file(xmlFile, q= 1, ex= 1):
 					logger.info('[' + rootNode + '] XML Loading...  ' + xmlFile.split(workRoot)[-1])
-					moMethod.mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateName)
+					moMethod.mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateName, staticInfo)
 				else:
 					logger.warning('[' + rootNode + '] XML not exists -> ' + xmlFile)
 		else:
@@ -299,17 +318,6 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 			moMethod.mImportRigkey(rigFile)
 		else:
 			logger.warning('[' + rootNode + '] No rigging controls to import.')
-
-		# go set frameRate and playback range
-		if isPartial:
-			logger.warning('In PARTIAL mode, No TimeInfo import.')
-		else:
-			timeInfoFile = moRules.rTimeInfoFilePath(geoCacheDir, assetName)
-			if cmds.file(timeInfoFile, q= 1, ex= 1):
-				moMethod.mImportTimeInfo(timeInfoFile)
-				logger.info('TimeInfo imported.')
-			else:
-				logger.warning('[' + rootNode + '] TimeInfo not exists.')
 
 		logger.info('[' + rootNode + ']' + (' PARTIAL' if isPartial else '') + ' imported.')
 

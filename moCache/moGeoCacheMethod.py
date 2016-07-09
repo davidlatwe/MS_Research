@@ -27,6 +27,27 @@ def mSetupWorkingNS(workingNS):
 	mGeneral.namespaceSet(workingNS)
 
 
+def mSetStaticRange(timelineInfo= None):
+	"""
+	"""
+	if timelineInfo:
+		cmds.playbackOptions(min= timelineInfo[0], max= timelineInfo[1])
+	else:
+		timelineInfo = [cmds.playbackOptions(q= 1, min= 1), cmds.playbackOptions(q= 1, max= 1)]
+		cmds.playbackOptions(max= cmds.playbackOptions(q= 1, min= 1) + 1)
+		
+		return timelineInfo
+
+
+def mRangePushBack(restore= None):
+	"""
+	"""
+	if restore:
+		cmds.playbackOptions(max= cmds.playbackOptions(q= 1, max= 1) - 1)
+	else:
+		cmds.playbackOptions(max= cmds.playbackOptions(q= 1, max= 1) + 1)
+
+
 def mProcQueue():
 	"""
 	傳回物件清單，可建立不同入列規則來產生不同範圍的物件清單
@@ -380,7 +401,7 @@ def mExportGeoCache(geoCacheDir, assetName):
 	mel.eval(evalCmd)
 
 
-def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateName):
+def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateName, staticInfo):
 	"""
 	"""
 	def importGeoProcess(dag):
@@ -415,12 +436,22 @@ def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateNa
 			mel.eval('importCacheFile "' + xmlFile + '" "Best Guess"')
 			if inputAni:
 				cmds.connectAttr(inputAni[0], anim_shape + '.visibility')
+			if staticInfo and staticInfo[0]:
+				for histNode in cmds.listHistory(dag, pdo= 1):
+					if cmds.nodeType(histNode) == 'cacheFile':
+						cmds.setAttr(histNode + '.hold', staticInfo[1] + 1)
 		else:
 			logger.warning('This node might not contenting shape node, but source rigging file dose.')
 
 	targetList = cmds.ls('*' + anim_trans, r= 1, l= 1, et= 'transform')
 	# conflictList: if conflict string included in dag name, remove in next step
-	inverseResult = [T for T in targetList for C in conflictList if not T.startswith('|' + assetNS) or C in T]
+	inverseResult = []
+	for T in targetList:
+		if not T.startswith('|' + assetNS):
+			inverseResult.append(T)
+		for C in conflictList:
+			if C in T:
+				inverseResult.append(T)
 	anim_transList = list(set(targetList) - set(inverseResult))
 	if len(anim_transList) == 1:
 		importGeoProcess(anim_transList[0])
@@ -435,10 +466,11 @@ def mImportGeoCache(xmlFile, assetNS, anim_trans, conflictList, ignorDuplicateNa
 		logger.warning('No target found -> ' + anim_trans)
 
 
-def mExportTimeInfo(timeInfoFile, timeUnit, playbackRange):
+def mExportTimeInfo(timeInfoFile, timeUnit, playbackRange, isStatic):
 	"""
 	"""
-	timeInfo = timeUnit + '\n' + str(playbackRange[0]) + ':' + str(playbackRange[1])
+	timeInfo = timeUnit + '\n' + str(playbackRange[0]) + ':' + str(playbackRange[1]) \
+		+ '\nisStatic = ' + str(isStatic)
 	with open(timeInfoFile, 'w') as timeInfoTxt:
 		timeInfoTxt.write(timeInfo)
 
@@ -453,6 +485,10 @@ def mImportTimeInfo(timeInfoFile):
 		cmds.playbackOptions(min= float(timeInfo[1].split(':')[0]))
 		cmds.playbackOptions(max= float(timeInfo[1].split(':')[1]))
 		logger.info('TimeInfo  [Range] ' + timeInfo[1])
+		exec(timeInfo[2])
+		logger.info('TimeInfo [Static] ' + str(isStatic))
+		
+		return [isStatic, float(timeInfo[1].split(':')[1])]
 
 
 def mGetSmoothMask(assetName):

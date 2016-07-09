@@ -998,7 +998,7 @@ def mkShotListBtn(windowName, shotColumn):
 			filePath_GEO = gcLog['shots'][shot]['GEO'][asset][date_GEO[-1]] if dateShortGEO else ''
 			fileName_GEO = os.path.basename(filePath_GEO) if dateShortGEO else ''
 			sceneName_GEO = os.path.splitext(fileName_GEO)[0] if dateShortGEO else ''
-			geoCacheDir = moGeoCache.getGeoCacheDir(asset, sceneName_GEO) if dateShortGEO else ''
+			geoCacheDir = moGeoCache.getGeoCacheDir(asset, 0, sceneName_GEO) if dateShortGEO else ''
 
 			astRow = rowLayout(nc= 2, adj= 1, h= 24)
 			shotFrameName_asset = frameLayout(l= asset, cll= 1, cl= 1, bgc= rgb_nor(hex_rgb('686868')),
@@ -1173,7 +1173,7 @@ def ui_geoCacheIO():
 					btnSHD = button(l= 'SHD', h= 37, w= 120, bgc= ctrSubsColor, c= submitSHD)
 					btnRIG = button(l= 'RIG', h= 37, w= 120, bgc= ctrSubsColor, c= submitRIG)
 					setParent('..')
-				'''
+				
 				rowLayout(nc= 7)
 				if True:
 					tex_com = text(l= 'Common: ', w= 55, al= 'right')
@@ -1204,7 +1204,7 @@ def ui_geoCacheIO():
 					txt_filt = text('  *Filter       ', en= 0)
 					textField('textF_filter', pht= 'string1;string2...', w= 125)
 					setParent('..')
-				'''
+				
 				rowLayout(nc= 3, adj= 3)
 				if True:
 					btnPushName = windowName + '_button_' + 'submit'
@@ -1256,21 +1256,21 @@ def ui_geoCacheIO():
 	dp_makePySideUI(btnMOD, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
 	dp_makePySideUI(btnSHD, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
 	dp_makePySideUI(btnRIG, 'QPushButton {font: 24px Courier; color: #8C7B3D;}')
-	#dp_makePySideUI(tex_com, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI(tex_pgeo, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('cBox_isPartial', 'QObject {color: #AAAAAA; background-color: #252525;}')
-	#dp_makePySideUI(txt_over1, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('textF_assetName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	#dp_makePySideUI(tex_exp, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI(tex_addD, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('intF_sdLevel', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	#dp_makePySideUI(txt_over2, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('textF_sceneName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
-	#dp_makePySideUI(tex_imp, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI(tex_sam, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('cBox_ignorDupl', 'QObject {color: #AAAAAA; background-color: #252525;}')
-	#dp_makePySideUI(txt_filt, 'QObject {color: #AAAAAA;}')
-	#dp_makePySideUI('textF_filter', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
+	dp_makePySideUI(tex_com, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI(tex_pgeo, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('cBox_isPartial', 'QObject {color: #AAAAAA; background-color: #252525;}')
+	dp_makePySideUI(txt_over1, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('textF_assetName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
+	dp_makePySideUI(tex_exp, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI(tex_addD, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('intF_sdLevel', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
+	dp_makePySideUI(txt_over2, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('textF_sceneName', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
+	dp_makePySideUI(tex_imp, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI(tex_sam, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('cBox_ignorDupl', 'QObject {color: #AAAAAA; background-color: #252525;}')
+	dp_makePySideUI(txt_filt, 'QObject {color: #AAAAAA;}')
+	dp_makePySideUI('textF_filter', 'QObject {color: #AAAAAA; background-color: #252525; border-radius: 2px;}')
 	dp_makePySideUI(btnPushName + 'ANI', 'QPushButton {font: 24px Courier; color: #9D344C;}')
 	dp_makePySideUI(btnPushName + 'CAM', 'QPushButton {font: 24px Courier; color: #9D344C;}')
 	dp_makePySideUI(btnPushName + 'GEO', 'QPushButton {font: 24px Courier; color: #AAAAAA;}')
