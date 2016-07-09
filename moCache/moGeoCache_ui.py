@@ -86,6 +86,98 @@ def exec_Import(actionType, paramDict):
 			)
 
 
+def prep_SHDSet(*args):
+	"""
+	"""
+	pass
+
+
+def prep_RIGSet(mode, *args):
+	"""
+	"""
+	sname = system.sceneName().namebase.lower()
+	if '_rigging_' not in sname or '_rig_' not in sname:
+		msg = 'This scene is not a rigging asseet.\n' \
+			+ '(Filename does not contain "_rigging_" or "_rig_".)'
+		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
+		return
+
+	if mode:
+		actSetName = 'moGeoCacheSmoothMask'
+		filt = ['mesh']
+	else:
+		actSetName = 'moGeoCacheRigCtrlExport'
+		filt = ['nurbsCurve', 'locator']
+
+	# deselect non-mesh object
+	objList = ls(sl= 1)
+	for obj in objList:
+		if (obj.nodeType() == 'transform' and obj.getShape().nodeType() not in filt)\
+		or (obj.nodeType() != 'transform' and obj.nodeType() not in filt):
+			select(obj, tgl= 1)
+	# check if set exists
+	objList = ls(sl= 1)
+	if objList:
+		actSet = ls(actSetName, typ= 'objectSet')
+		if actSet:
+			members = sets(actSet[0], q= 1, no= 1)
+			for obj in objList:
+				if obj.nodeType() != 'transform':
+					obj = obj.getParent()
+				if obj in members:
+					# remove mesh
+					sets(actSet[0], rm= obj)
+				else:
+					# add mesh
+					sets(actSet[0], add= obj)
+		else:
+			# create set and add mesh
+			cmds.sets(n= actSetName)
+
+
+def prep_setSmoothIncludsive(*args):
+	"""
+	"""
+	global cBox_inclusive
+	sname = system.sceneName().namebase.lower()
+	if '_rigging_' not in sname or '_rig_' not in sname:
+		msg = 'This scene is not a rigging asseet.\n' \
+			+ '(Filename does not contain "_rigging_" or "_rig_".)'
+		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
+		checkBox(cBox_inclusive, e= 1, v= 0)
+		return
+
+	smoothSetName = 'moGeoCacheSmoothMask'
+
+	smoothSet = ls(smoothSetName, typ= 'objectSet')
+	if smoothSet:
+		if not attributeQuery('smoothIncludsive', node= smoothSet[0], ex= 1):
+			addAttr(smoothSet[0], ln= 'smoothIncludsive', sn= 'si', at= 'bool')
+		value = checkBox(cBox_inclusive, q= 1, v= 1)
+		setAttr(smoothSet[0] + '.smoothIncludsive', value)
+	else:
+		checkBox(cBox_inclusive, e= 1, v= 0)
+
+
+def ui_getSmoothIncludsive():
+	"""
+	"""
+	global cBox_inclusive
+	sname = system.sceneName().namebase.lower()
+	if '_rigging_' not in sname or '_rig_' not in sname:
+		checkBox(cBox_inclusive, e= 1, v= 0)
+		return
+
+	smoothSetName = 'moGeoCacheSmoothMask'
+	
+	smoothSet = ls(smoothSetName, typ= 'objectSet')
+	if smoothSet and attributeQuery('smoothIncludsive', node= smoothSet[0], ex= 1):
+		value = getAttr(smoothSet[0] + '.smoothIncludsive')
+		checkBox(cBox_inclusive, e= 1, v= 1)
+	else:
+		checkBox(cBox_inclusive, e= 1, v= 0)
+
+
 def ui_getAssetName():
 	"""
 	"""
@@ -115,7 +207,9 @@ def ui_getSceneName():
 def ui_initPrep(sideValue):
 	"""
 	"""
-	frameLayout(l= 'Ignition Preparation')
+	global cBox_inclusive
+
+	frameLayout(l= ' Preparation  -  S H D   R I G')
 	columnLayout(adj= 1, rs= 4)
 	if True:
 		columnLayout(adj= 1)
@@ -144,41 +238,19 @@ def ui_initPrep(sideValue):
 			rowLayout(nc= 2, adj= 2, h= 20)
 			if True:
 				text(l= '', w= sideValue)
-				cBox_inclusive = checkBox(l= 'Includsive')
+				cBox_inclusive = checkBox(l= 'Includsive', cc= prep_setSmoothIncludsive)
 				setParent('..')
 			rowLayout(nc= 3, adj= 2)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeSmoothSet = button(l= 'Make Smooth Set')
+				btn_makeSmoothSet = button(l= 'Smooth Set', c= partial(prep_RIGSet, 1))
 				text(l= '', w= sideValue)
 				setParent('..')
 			text(l= '', h= 5)
 			rowLayout(nc= 3, adj= 2, h= 24)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeCurvesSet = button(l= 'Make Curves Set')
-				text(l= '', w= sideValue)
-				setParent('..')
-			setParent('..')
-
-		columnLayout(adj= 1)
-		if True:
-			rowLayout(nc= 3, adj= 3, h= 30)
-			if True:
-				separator(h= 10, st= 'double', en= 0, w= 5)
-				tex_cpa = text(l= 'Compare', al= 'center', fn= 'boldLabelFont', w= 50)
-				separator(h= 10, st= 'double', en= 0)
-				setParent('..')
-			rowLayout(nc= 3, adj= 2, h= 36)
-			if True:
-				text(l= '', w= sideValue)
-				btn_meshCompare = button(l= 'SHD - RIG\nMesh Compare', al= 'center', h= 32)
-				text(l= '', w= sideValue)
-				setParent('..')
-			rowLayout(nc= 3, adj= 2, h= 24)
-			if True:
-				text(l= '', w= sideValue)
-				tex_meshCompare = text(l= 'Result : ', al= 'left')
+				btn_makeCurvesSet = button(l= 'Curves Set', c= partial(prep_RIGSet, 0))
 				text(l= '', w= sideValue)
 				setParent('..')
 			setParent('..')
@@ -192,7 +264,6 @@ def ui_initPrep(sideValue):
 def ui_geoCache(midValue):
 	"""
 	"""
-	global windowName
 	global rbtn_geoIO
 	global txt_infoAssetName
 	global txt_infoSceneName
@@ -206,7 +277,7 @@ def ui_geoCache(midValue):
 	global textF_filter
 	global rbtn_execBy
 
-	frameLayout(l= 'GeoCache I/O Controls')
+	frameLayout(l= ' GeoCaching  -  A N I   S I M')
 	columnLayout(adj= 1)
 	if True:
 		columnLayout(adj= 1)
@@ -390,9 +461,9 @@ def ui_geoCache(midValue):
 						textField(textF_choose, e= 1, tx= folderName)
 						text(txt_infoSceneName, e= 1, l= folderName)
 					else:
-						msg = 'This asset dose not have this geoCache folder.'
+						msg = 'This asset does not have this geoCache folder.'
 			else:
-				msg = 'Asset [ ' + assetName + ' ] dose not exists in the moGeoCache folder.'
+				msg = 'Asset [ ' + assetName + ' ] does not exists in the moGeoCache folder.'
 		else:
 			msg = 'Select an Asset first.'
 		if msg:
@@ -419,9 +490,11 @@ def ui_main():
 
 	scriptJob(e= ['SelectionChanged', ui_getAssetName], p= windowName)
 	scriptJob(e= ['PostSceneRead', ui_getSceneName], p= windowName)
+	scriptJob(e= ['PostSceneRead', ui_getSmoothIncludsive], p= windowName)
 	ui_getAssetName()
 	ui_getSceneName()
+	ui_getSmoothIncludsive()
 
 	#cmds.window('ms_GeoCache_uiMain', q= 1, h= 1)
-	window(windowName, e= 1, h= 604, w= 270)
+	window(windowName, e= 1, h= 512, w= 270)
 	showWindow(windowName)

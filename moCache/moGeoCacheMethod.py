@@ -502,8 +502,9 @@ def mGetSmoothMask(assetName):
 			if ':' not in set or (':' in set and set.startswith(assetName)):
 				for obj in cmds.sets(set, q= 1, no= 1):
 					smoothmask.append(obj.split(':')[-1])
-				smoothInclusive = True if cmds.getAttr(set + '.smoothInclusive') else False
-				break
+				if cmds.attributeQuery('smoothInclusive', node= set, ex= 1):
+					smoothInclusive = True if cmds.getAttr(set + '.smoothInclusive') else False
+					break
 				
 	return smoothInclusive, smoothmask
 
