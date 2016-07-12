@@ -495,18 +495,18 @@ def mGetSmoothMask(assetName):
 	"""
 	"""
 	smoothmask = []
-	smoothInclusive = False
+	smoothExclusive = False
 	setList = cmds.ls('*moGeoCacheSmoothMask', r= 1, typ= 'objectSet')
 	if setList:
 		for set in setList:
 			if ':' not in set or (':' in set and set.startswith(assetName)):
 				for obj in cmds.sets(set, q= 1, no= 1):
 					smoothmask.append(obj.split(':')[-1])
-				if cmds.attributeQuery('smoothInclusive', node= set, ex= 1):
-					smoothInclusive = True if cmds.getAttr(set + '.smoothInclusive') else False
+				if cmds.attributeQuery('smoothExclusive', node= set, ex= 1):
+					smoothExclusive = True if cmds.getAttr(set + '.smoothExclusive') else False
 					break
 				
-	return smoothInclusive, smoothmask
+	return smoothExclusive, smoothmask
 
 
 def mGetRigCtrlExportList(assetName):

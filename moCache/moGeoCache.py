@@ -17,8 +17,8 @@ def _getRootNode(assetName_override= None):
 
 	rootNode_List = moMethod.mProcQueue()
 	if assetName_override and len(rootNode_List) > 1:
-		rootNode_List = [rootNode_List[0]]
-		logger.warning('AssetName has override, only the first rootNode will be processed.')
+		rootNode_List = [rootNode_List[-1]]
+		logger.warning('AssetName has override, only the last rootNode will be processed.')
 
 	return rootNode_List
 
@@ -31,7 +31,7 @@ def getAssetList():
 		assetName = moRules.rAssetName(moRules.rAssetNS(rootNode))
 		assetList.append(assetName)
 	if not assetList:
-		logger.warning('assetList is empty as your soul.')
+		logger.info('assetList is empty as your soul.')
 
 	return assetList
 
@@ -104,7 +104,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 		assetName = moRules.rAssetName(assetNS) if not assetName_override else assetName_override
 		geoCacheDir = getGeoCacheDir(assetName, 1, sceneName_override)
 		geoFileType = moRules.rGeoFileType()
-		smoothInclusive, smoothMask = moMethod.mGetSmoothMask(assetName)
+		smoothExclusive, smoothMask = moMethod.mGetSmoothMask(assetName)
 		rigCtrlList = moMethod.mGetRigCtrlExportList(assetName)
 
 		logger.info('AssetName: [' + assetName + ']')
@@ -181,7 +181,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 			# subdiv before export
 			if subdivLevel:
 				for ves in cmds.listRelatives(ves_grp, c= 1):
-					if ((ves.split(':')[-1] not in smoothMask) + smoothInclusive) % 2:
+					if ((ves.split(':')[-1] in smoothMask) + smoothExclusive) % 2:
 						moMethod.mSmoothMesh(ves, subdivLevel)
 			# write out transform node's name
 			for ves in cmds.listRelatives(ves_grp, c= 1):

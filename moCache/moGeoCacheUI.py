@@ -6,7 +6,9 @@ Created on 2016.07.06
 '''
 from pymel.core import *
 from functools import partial
+from subprocess import Popen, PIPE
 import moCache.moGeoCache as moGeoCache; reload(moGeoCache)
+import moCache.moGeoCacheUICmdExport as moGeoCacheUICmdExport; reload(moGeoCacheUICmdExport)
 import os
 
 
@@ -18,7 +20,7 @@ def exec_getParams(*args):
 	global txt_infoSceneName
 	global cBox_isPartial
 	global cBox_isStatic
-	global intF_division
+	global cBox_division
 	global cBox_dupName
 	global textF_filter
 	global rbtn_execBy
@@ -26,13 +28,13 @@ def exec_getParams(*args):
 	conflictList = str(textField(textF_filter, q= 1, tx= 1))
 	assetName_override = str(textField(textF_assetName, q= 1, tx= 1))
 	paramDict = {
-		'isPartial' : checkBox(cBox_isPartial, q= 1, v= 1),
-		 'isStatic' : checkBox(cBox_isStatic, q= 1, v= 1),
-		 'sameName' : checkBox(cBox_dupName, q= 1, v= 1),
 		'assetName' : assetName_override if assetName_override else None,
 		'sceneName' : str(text(txt_infoSceneName, q= 1, l= 1)),
-		 'conflict' : [] if not conflictList else conflictList.split(';'),
-		   'subdiv' : intFieldGrp(intF_division, q= 1, v1= 1)
+		'isPartial' : checkBox(cBox_isPartial, q= 1, v= 1),
+		 'isStatic' : checkBox(cBox_isStatic, q= 1, v= 1),
+		   'subdiv' : 1 if checkBox(cBox_division, q= 1, v= 1) else None,
+		 'sameName' : checkBox(cBox_dupName, q= 1, v= 1),
+		 'conflict' : conflictList.split(';') if conflictList else []
 	}
 
 	if exec_checkParam(paramDict):
@@ -41,13 +43,23 @@ def exec_getParams(*args):
 		if mode == 1:
 			exec_Export(actionType, paramDict)
 		if mode == 2:
-			exec_Import(actionType, paramDict)
+			exec_Import(3, paramDict)
 
 
 def exec_checkParam(paramDict):
 	"""
 	"""
-	for param in paramDict:
+	paramList = [
+		'assetName',
+		'sceneName',
+		'isPartial',
+		 'isStatic',
+		   'subdiv',
+		 'sameName',
+		 'conflict'
+	]
+
+	for param in paramList:
 		print param.rjust(10) + ' : ' + str(paramDict[param])
 	return True
 
@@ -56,7 +68,12 @@ def exec_Export(actionType, paramDict):
 	"""
 	"""
 	if actionType == 1:
-		pass
+		pyFile = moGeoCacheUICmdExport.__file__
+		projPath = workspace(q= 1, rd= 1)
+		filePath = str(system.sceneName())
+		assetList = str([dag.name() for dag in ls(sl= 1)])
+		paramDict = str(paramDict)
+		Popen(['mayapy', pyFile, projPath, filePath, assetList, paramDict], shell= False)
 	if actionType == 2:
 		pass
 	if actionType == 3:
@@ -72,10 +89,12 @@ def exec_Export(actionType, paramDict):
 def exec_Import(actionType, paramDict):
 	"""
 	"""
+	'''
 	if actionType == 1:
 		pass
 	if actionType == 2:
 		pass
+	'''
 	if actionType == 3:
 		moGeoCache.importGeoCache(
 			sceneName= paramDict['sceneName'],
@@ -96,9 +115,9 @@ def prep_RIGSet(mode, *args):
 	"""
 	"""
 	sname = system.sceneName().namebase.lower()
-	if '_rigging_' not in sname or '_rig_' not in sname:
+	if '_rigging_' not in sname and '_rig_' not in sname:
 		msg = 'This scene is not a rigging asseet.\n' \
-			+ '(Filename does not contain "_rigging_" or "_rig_".)'
+			+ '(Filename does not contain "_rigging_" and "_rig_".)'
 		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
 		return
 
@@ -135,47 +154,47 @@ def prep_RIGSet(mode, *args):
 			cmds.sets(n= actSetName)
 
 
-def prep_setSmoothIncludsive(*args):
+def prep_setSmoothExclusive(*args):
 	"""
 	"""
-	global cBox_inclusive
+	global cBox_exclusive
 	sname = system.sceneName().namebase.lower()
-	if '_rigging_' not in sname or '_rig_' not in sname:
+	if '_rigging_' not in sname and '_rig_' not in sname:
 		msg = 'This scene is not a rigging asseet.\n' \
-			+ '(Filename does not contain "_rigging_" or "_rig_".)'
+			+ '(Filename does not contain "_rigging_" and "_rig_".)'
 		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
-		checkBox(cBox_inclusive, e= 1, v= 0)
+		checkBox(cBox_exclusive, e= 1, v= 0)
 		return
 
 	smoothSetName = 'moGeoCacheSmoothMask'
 
 	smoothSet = ls(smoothSetName, typ= 'objectSet')
 	if smoothSet:
-		if not attributeQuery('smoothIncludsive', node= smoothSet[0], ex= 1):
-			addAttr(smoothSet[0], ln= 'smoothIncludsive', sn= 'si', at= 'bool')
-		value = checkBox(cBox_inclusive, q= 1, v= 1)
-		setAttr(smoothSet[0] + '.smoothIncludsive', value)
+		if not attributeQuery('smoothExclusive', node= smoothSet[0], ex= 1):
+			addAttr(smoothSet[0], ln= 'smoothExclusive', sn= 'si', at= 'bool')
+		value = checkBox(cBox_exclusive, q= 1, v= 1)
+		setAttr(smoothSet[0] + '.smoothExclusive', value)
 	else:
-		checkBox(cBox_inclusive, e= 1, v= 0)
+		checkBox(cBox_exclusive, e= 1, v= 0)
 
 
-def ui_getSmoothIncludsive():
+def ui_getSmoothExclusive():
 	"""
 	"""
-	global cBox_inclusive
+	global cBox_exclusive
 	sname = system.sceneName().namebase.lower()
-	if '_rigging_' not in sname or '_rig_' not in sname:
-		checkBox(cBox_inclusive, e= 1, v= 0)
+	if '_rigging_' not in sname and '_rig_' not in sname:
+		checkBox(cBox_exclusive, e= 1, v= 0)
 		return
 
 	smoothSetName = 'moGeoCacheSmoothMask'
 	
 	smoothSet = ls(smoothSetName, typ= 'objectSet')
-	if smoothSet and attributeQuery('smoothIncludsive', node= smoothSet[0], ex= 1):
-		value = getAttr(smoothSet[0] + '.smoothIncludsive')
-		checkBox(cBox_inclusive, e= 1, v= 1)
+	if smoothSet and attributeQuery('smoothExclusive', node= smoothSet[0], ex= 1):
+		value = getAttr(smoothSet[0] + '.smoothExclusive')
+		checkBox(cBox_exclusive, e= 1, v= 1)
 	else:
-		checkBox(cBox_inclusive, e= 1, v= 0)
+		checkBox(cBox_exclusive, e= 1, v= 0)
 
 
 def ui_getAssetName():
@@ -186,6 +205,7 @@ def ui_getAssetName():
 			assetList = moGeoCache.getAssetList()
 			text(txt_infoAssetName, e= 1, l= ', '.join(assetList))
 		else:
+			warning('AssetName has override, only the last rootNode will be processed.')
 			text(txt_infoAssetName, e= 1, l= textField(textF_assetName, q= 1, tx= 1))
 	else:
 		text(txt_infoAssetName, e= 1, l= '')
@@ -207,7 +227,7 @@ def ui_getSceneName():
 def ui_initPrep(sideValue):
 	"""
 	"""
-	global cBox_inclusive
+	global cBox_exclusive
 
 	frameLayout(l= ' Preparation  -  S H D   R I G')
 	columnLayout(adj= 1, rs= 4)
@@ -238,19 +258,19 @@ def ui_initPrep(sideValue):
 			rowLayout(nc= 2, adj= 2, h= 20)
 			if True:
 				text(l= '', w= sideValue)
-				cBox_inclusive = checkBox(l= 'Includsive', cc= prep_setSmoothIncludsive)
+				cBox_exclusive = checkBox(l= 'Excludsive', cc= prep_setSmoothExclusive)
 				setParent('..')
 			rowLayout(nc= 3, adj= 2)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeSmoothSet = button(l= 'Smooth Set', c= partial(prep_RIGSet, 1))
+				btn_makeSmoothSet = button(l= 'Model Smooth Set', c= partial(prep_RIGSet, 1))
 				text(l= '', w= sideValue)
 				setParent('..')
 			text(l= '', h= 5)
 			rowLayout(nc= 3, adj= 2, h= 24)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeCurvesSet = button(l= 'Curves Set', c= partial(prep_RIGSet, 0))
+				btn_makeCurvesSet = button(l= 'Rigging Control Set', c= partial(prep_RIGSet, 0))
 				text(l= '', w= sideValue)
 				setParent('..')
 			setParent('..')
@@ -270,7 +290,7 @@ def ui_geoCache(midValue):
 	global cBox_isPartial
 	global cBox_isStatic
 	global textF_assetName
-	global intF_division
+	global cBox_division
 	global textF_sceneName
 	global menu_choose
 	global cBox_dupName
@@ -343,17 +363,25 @@ def ui_geoCache(midValue):
 				text(l= '', w= midValue)
 				cBox_isStatic = checkBox(l= 'Static Object')
 				setParent('..')
+			'''
 			rowLayout(nc= 3, adj= 3, h= 22)
 			if True:
 				text(l= '( 0~4 ) ', al= 'right', en= 0, w= midValue)
 				intF_division = intFieldGrp(l= '', v1= 0, ad2= 1, cw= [2, 36], w= 40, en= en)
 				tex_division = text(l= 'Division Smooth', al= 'left', en= en)
 				setParent('..')
+			'''
+			rowLayout(nc= 2, adj= 2)
+			if True:
+				text(l= '', w= midValue)
+				cBox_division = checkBox(l= 'Division Smooth')
+				setParent('..')
 			rowLayout(nc= 2, adj= 2)
 			if True:
 				txt_sceneName = text('Scene ', al= 'right', w= midValue, en= en)
 				textF_sceneName = textField(pht= 'sceneName override', en= en)
 				setParent('..')
+			text(l= '', h= 3)
 			setParent('..')
 
 		col_imp = columnLayout(adj= 1, vis= 0)
@@ -383,7 +411,7 @@ def ui_geoCache(midValue):
 				setParent('..')
 			setParent('..')
 
-		columnLayout(adj= 1)
+		col_action = columnLayout(adj= 1)
 		actValue = 50
 		if True:
 			rowLayout(nc= 3, adj= 3)
@@ -401,13 +429,14 @@ def ui_geoCache(midValue):
 				setParent('..')
 
 			text(l= '', h= 5)
-			button(l= 'Execute', h= 50, c= exec_getParams)
 			setParent('..')
+		button(l= 'Execute', h= 50, c= exec_getParams)
 
 		setParent('..')
 	setParent('..')
 
 	# commands
+	'''
 	def intcmd_setMinMax(*args):
 		global intF_division
 		intvalue = intFieldGrp(intF_division, q= 1, v1= 1)
@@ -417,13 +446,16 @@ def ui_geoCache(midValue):
 			intFieldGrp(intF_division, e= 1, v1= 4)
 
 	intFieldGrp(intF_division, e= 1, cc= intcmd_setMinMax)
+	'''
 
 	def geoCacheIOctrlSwitch(col, vis, *args):
 		layout(col, e= 1, vis= vis)
 		if col == col_exp and vis:
+			columnLayout(col_action, e= 1, en= 1)
 			checkBox(cBox_isPartial, e= 1, l= 'Partial Export')
 			ui_getSceneName()
 		if col == col_imp and vis:
+			columnLayout(col_action, e= 1, en= 0)
 			checkBox(cBox_isPartial, e= 1, l= 'Partial Import')
 			text(txt_infoSceneName, e= 1, l= textField(textF_choose, q= 1, tx= 1))
 
@@ -481,7 +513,7 @@ def ui_main():
 	if window(windowName, q= 1, ex= 1):
 		deleteUI(windowName)
 
-	window(windowName, t= 'GeoCache Settings', s= 0, mxb= 0, mnb= 0)
+	window(windowName, t= 'GeoCache Settings', s= 1, mxb= 0, mnb= 0)
 	main_column = columnLayout(adj= 1)
 	# geoCache
 	ui_initPrep(50)
@@ -490,10 +522,10 @@ def ui_main():
 
 	scriptJob(e= ['SelectionChanged', ui_getAssetName], p= windowName)
 	scriptJob(e= ['PostSceneRead', ui_getSceneName], p= windowName)
-	scriptJob(e= ['PostSceneRead', ui_getSmoothIncludsive], p= windowName)
+	scriptJob(e= ['PostSceneRead', ui_getSmoothExclusive], p= windowName)
 	ui_getAssetName()
 	ui_getSceneName()
-	ui_getSmoothIncludsive()
+	ui_getSmoothExclusive()
 
 	#cmds.window('ms_GeoCache_uiMain', q= 1, h= 1)
 	window(windowName, e= 1, h= 512, w= 270)
