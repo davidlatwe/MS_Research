@@ -55,7 +55,7 @@ def exportCam(shotNum= None):
 			mGeneral.namespaceSet(workingNS)
 			logger.info('Camera export start.')
 			# duplicate to root
-			resultCamList = parent(duplicate(sourceCamList, ic= 1), group(em= 1, w= 1, n= 'moCameraGrp'))
+			resultCamList = parent(duplicate(sourceCamList, ic= 0), group(em= 1, w= 1, n= 'moCameraGrp'))
 			
 			for i, cam in enumerate(resultCamList):
 				# unlock transform
@@ -63,7 +63,7 @@ def exportCam(shotNum= None):
 				cam.rx.unlock();cam.ry.unlock();cam.rz.unlock()
 				cam.sx.unlock();cam.sy.unlock();cam.sz.unlock()
 				# make constrain
-				constrainNode = parentConstraint(sourceCamList[i], cam)
+				constrainNode = parentConstraint(sourceCamList[i], cam, mo= 0)
 				# bake animation
 				bakeResults(cam, at= ['.t', '.r', '.s'], t= [sInfo.palybackStart, sInfo.palybackEnd], sm= 1, s= 0)
 				# delete constrain node

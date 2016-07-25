@@ -70,11 +70,11 @@ def namespaceList(current= None):
 	return cmds.namespaceInfo(lon= 1, r= 1, an= 1)
 
 
-def namespaceDel(name):
+def namespaceDel(name, wipeOut= None):
 	"""
 	"""
 	for ns in namespaceList():
-		if name in ns:
+		if (name in ns) if wipeOut else (name == ns):
 			cmds.namespace(f= 1, rm = ns, dnc = 1)
 
 

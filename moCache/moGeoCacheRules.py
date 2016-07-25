@@ -17,6 +17,13 @@ def _getSceneInfo():
 	return moSceneInfo.SceneInfo()
 
 
+def rCurrentSceneName():
+	"""
+	"""
+	sInfo = _getSceneInfo()
+	return sInfo.sceneSplitExt
+
+
 def rWorkingNS():
 	"""
 	"""
@@ -27,6 +34,12 @@ def rViskeyNS():
 	"""
 	"""
 	return ':moGeoCacheViskey'
+
+
+def rNodeOutNS():
+	"""
+	"""
+	return ':moNodeOutkey'
 
 
 def rRigkeyNS():
@@ -131,7 +144,16 @@ def rViskeyFilePath(geoCacheDir, assetName, visAniNode):
 	"""
 	"""
 	sInfo = _getSceneInfo()
-	filePath = geoCacheDir + sInfo.sep + assetName + '@' + visAniNode.split(':')[-1] + '_visKeys.ma'
+	filePath = geoCacheDir + sInfo.sep + assetName + '@' + visAniNode.split(':')[-1].split('|')[-1] + '_visKeys.ma'
+
+	return filePath
+
+
+def rOutkeyFilePath(geoCacheDir, assetName, outAniNode):
+	"""
+	"""
+	sInfo = _getSceneInfo()
+	filePath = geoCacheDir + sInfo.sep + assetName + '@' + outAniNode.split(':')[-1].split('|')[-1] + '_outKeys.ma'
 
 	return filePath
 

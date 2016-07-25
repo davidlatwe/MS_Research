@@ -105,10 +105,50 @@ def exec_Import(actionType, paramDict):
 			)
 
 
-def prep_SHDSet(*args):
+def prep_SHDSet(mode, *args):
 	"""
 	"""
-	pass
+	sname = system.sceneName().namebase.lower()
+	if '_shading_' not in sname and '_shd_' not in sname:
+		msg = 'This scene is not a shading asseet.\n' \
+			+ '(Filename does not contain "_shading_" or "_shd_".)'
+		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
+		return
+
+	if mode == 'wrapSet':
+		actSetName = 'moGCWrap'
+		filt = ['mesh']
+
+	# deselect non-filt object
+	objList = ls(sl= 1)
+	for obj in objList:
+		if (obj.nodeType() == 'transform' and obj.getShape().nodeType() not in filt)\
+		or (obj.nodeType() != 'transform' and obj.nodeType() not in filt):
+			select(obj, tgl= 1)
+	# check if set exists
+	objList = ls(sl= 1)
+
+	if mode == 'wrapSet':
+		if len(objList) > 1:
+			actSet = ls(actSetName + '_*', typ= 'objectSet')
+			srcObj = objList[-1].name()
+			if actSet:
+				wsDict = {}
+				for wSet in actSet:
+					wsDict[getAttr(wSet + '.wrapSource')] = wSet
+				# check if selected source had assigned
+				if srcObj in wsDict.keys():
+					sets(wsDict[srcObj], add= objList)
+
+					return
+			# create set and add mesh
+			wSet = sets(n= actSetName + '_1')
+			addAttr(wSet, ln= 'wrapSource', dt= 'string')
+			setAttr(wSet + '.wrapSource', srcObj)
+		else:
+			msg = 'Select at least two objects.\n' \
+				+ '(wrap targets, and one wrap source.)'
+			confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
 
 
 def prep_RIGSet(mode, *args):
@@ -117,28 +157,44 @@ def prep_RIGSet(mode, *args):
 	sname = system.sceneName().namebase.lower()
 	if '_rigging_' not in sname and '_rig_' not in sname:
 		msg = 'This scene is not a rigging asseet.\n' \
-			+ '(Filename does not contain "_rigging_" and "_rig_".)'
+			+ '(Filename does not contain "_rigging_" or "_rig_".)'
 		confirmDialog(t= 'Abort', m= msg, b= ['Ok'], db= 'Ok', icn= 'warning')
 		return
 
-	if mode:
-		actSetName = 'moGeoCacheSmoothMask'
+	if mode == 'smoothSet':
+		actSetName = 'moGCSmoothMask'
 		filt = ['mesh']
-	else:
-		actSetName = 'moGeoCacheRigCtrlExport'
+	if mode == 'rigCtrlSet':
+		actSetName = 'moGCRigCtrlExport'
 		filt = ['nurbsCurve', 'locator']
+	if mode == 'nodeOutSet':
+		actSetName = 'moGCNodeOut'
+		filt = ['mesh']
 
-	# deselect non-mesh object
-	objList = ls(sl= 1)
-	for obj in objList:
-		if (obj.nodeType() == 'transform' and obj.getShape().nodeType() not in filt)\
-		or (obj.nodeType() != 'transform' and obj.nodeType() not in filt):
-			select(obj, tgl= 1)
+	if mode != 'nodeOutSet':
+		# deselect non-filt object
+		objList = ls(sl= 1)
+		for obj in objList:
+			if (obj.nodeType() == 'transform' and obj.getShape().nodeType() not in filt)\
+			or (obj.nodeType() != 'transform' and obj.nodeType() not in filt):
+				select(obj, tgl= 1)
+		objList = ls(sl= 1)
+
+	if mode == 'nodeOutSet':
+		objList = []
+		mChB =  uitypes.ChannelBox('mainChannelBox')
+		ctrlList = mChB.getMainObjectList()
+		attrList = mChB.getSelectedMainAttributes()
+		if ctrlList:
+			exec('dag = SCENE.' + ctrlList[0])
+			objList = [dag]
+
 	# check if set exists
-	objList = ls(sl= 1)
 	if objList:
 		actSet = ls(actSetName, typ= 'objectSet')
 		if actSet:
+			if mode == 'nodeOutSet':
+				nOutNodeDict = eval(actSet[0].outNodeDict.get())
 			members = sets(actSet[0], q= 1, no= 1)
 			for obj in objList:
 				if obj.nodeType() != 'transform':
@@ -146,12 +202,23 @@ def prep_RIGSet(mode, *args):
 				if obj in members:
 					# remove mesh
 					sets(actSet[0], rm= obj)
+					if mode == 'nodeOutSet':
+						del nOutNodeDict[obj.name()]
+						actSet[0].outNodeDict.set(str(nOutNodeDict))
 				else:
 					# add mesh
 					sets(actSet[0], add= obj)
+					if mode == 'nodeOutSet':
+						nOutNodeDict[obj.name()] = attrList
+						actSet[0].outNodeDict.set(str(nOutNodeDict))
 		else:
 			# create set and add mesh
-			cmds.sets(n= actSetName)
+			actSet = sets(n= actSetName)
+			if mode == 'nodeOutSet':
+				nOutNodeDict = { objList[0].name() : attrList }
+				if not attributeQuery('outNodeDict', node= actSet, ex= 1):
+					addAttr(actSet, ln= 'outNodeDict', dt= 'string')
+				actSet.outNodeDict.set(str(nOutNodeDict))
 
 
 def prep_setSmoothExclusive(*args):
@@ -166,12 +233,12 @@ def prep_setSmoothExclusive(*args):
 		checkBox(cBox_exclusive, e= 1, v= 0)
 		return
 
-	smoothSetName = 'moGeoCacheSmoothMask'
+	smoothSetName = 'moGCSmoothMask'
 
 	smoothSet = ls(smoothSetName, typ= 'objectSet')
 	if smoothSet:
 		if not attributeQuery('smoothExclusive', node= smoothSet[0], ex= 1):
-			addAttr(smoothSet[0], ln= 'smoothExclusive', sn= 'si', at= 'bool')
+			addAttr(smoothSet[0], ln= 'smoothExclusive', at= 'bool')
 		value = checkBox(cBox_exclusive, q= 1, v= 1)
 		setAttr(smoothSet[0] + '.smoothExclusive', value)
 	else:
@@ -187,7 +254,7 @@ def ui_getSmoothExclusive():
 		checkBox(cBox_exclusive, e= 1, v= 0)
 		return
 
-	smoothSetName = 'moGeoCacheSmoothMask'
+	smoothSetName = 'moGCSmoothMask'
 	
 	smoothSet = ls(smoothSetName, typ= 'objectSet')
 	if smoothSet and attributeQuery('smoothExclusive', node= smoothSet[0], ex= 1):
@@ -243,7 +310,7 @@ def ui_initPrep(sideValue):
 			rowLayout(nc= 3, adj= 2)
 			if True:
 				text(l= '', w= sideValue)
-				btn_addWrapSet = button(l= 'Add Wrap Set')
+				btn_addWrapSet = button(l= 'Add Wrap Set', c= partial(prep_SHDSet, 'wrapSet'))
 				text(l= '', w= sideValue)
 				setParent('..')
 
@@ -255,22 +322,29 @@ def ui_initPrep(sideValue):
 				tex_rig = text(l= 'R I G', al= 'center', fn= 'boldLabelFont', w= 40)
 				separator(h= 10, st= 'double', en= 0)
 				setParent('..')
-			rowLayout(nc= 2, adj= 2, h= 20)
+			rowLayout(nc= 2, adj= 2, h= 18)
 			if True:
 				text(l= '', w= sideValue)
-				cBox_exclusive = checkBox(l= 'Excludsive', cc= prep_setSmoothExclusive)
+				cBox_exclusive = checkBox(l= 'Make Smooth Set Excludsive', cc= prep_setSmoothExclusive)
 				setParent('..')
 			rowLayout(nc= 3, adj= 2)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeSmoothSet = button(l= 'Model Smooth Set', c= partial(prep_RIGSet, 1))
+				btn_makeSmoothSet = button(l= 'Model Smooth Set', c= partial(prep_RIGSet, 'smoothSet'))
 				text(l= '', w= sideValue)
 				setParent('..')
-			text(l= '', h= 5)
-			rowLayout(nc= 3, adj= 2, h= 24)
+			#text(l= '', h= 5)
+			rowLayout(nc= 3, adj= 2)
 			if True:
 				text(l= '', w= sideValue)
-				btn_makeCurvesSet = button(l= 'Rigging Control Set', c= partial(prep_RIGSet, 0))
+				btn_makeCurvesSet = button(l= 'Rigging Control Set', c= partial(prep_RIGSet, 'rigCtrlSet'))
+				text(l= '', w= sideValue)
+				setParent('..')
+			#text(l= '', h= 5)
+			rowLayout(nc= 3, adj= 2)
+			if True:
+				text(l= '', w= sideValue)
+				btn_makeSpecKeyRig = button(l= 'Node Output Set', c= partial(prep_RIGSet, 'nodeOutSet'))
 				text(l= '', w= sideValue)
 				setParent('..')
 			setParent('..')
@@ -297,7 +371,7 @@ def ui_geoCache(midValue):
 	global textF_filter
 	global rbtn_execBy
 
-	frameLayout(l= ' GeoCaching  -  A N I   S I M')
+	frameLayout(l= ' GeoCaching  -  A N I   S I M   G E O')
 	columnLayout(adj= 1)
 	if True:
 		columnLayout(adj= 1)
@@ -522,6 +596,7 @@ def ui_main():
 
 	scriptJob(e= ['SelectionChanged', ui_getAssetName], p= windowName)
 	scriptJob(e= ['PostSceneRead', ui_getSceneName], p= windowName)
+	scriptJob(e= ['SceneSaved', ui_getSceneName], p= windowName)
 	scriptJob(e= ['PostSceneRead', ui_getSmoothExclusive], p= windowName)
 	ui_getAssetName()
 	ui_getSceneName()

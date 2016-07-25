@@ -80,6 +80,13 @@ def main(projPath, filePath, assetList, paramDict):
 	mel.eval('scOpt_saveAndClearOptionVars(0);')
 	mel.eval('putenv "MAYA_TESTING_CLEANUP" "";')
 	
+	[nuc.enable.set(0) for nuc in ls(typ= 'nucleus')]
+	[ncl.isDynamic.set(0) for ncl in ls(typ= 'nCloth')]
+	[nrg.isDynamic.set(0) for nrg in ls(typ= 'nRigid')]
+	[ndc.enable.set(0) for ndc in ls(typ= 'dynamicConstraint')]
+	[nhr.simulationMethod.set(0) for nhr in ls(typ= 'hairSystem')]
+	[nhr.active.set(0) for nhr in ls(typ= 'hairSystem')]
+
 	moGeoCache.exportGeoCache(
 		subdivLevel= paramDict['subdiv'],
 		isPartial= paramDict['isPartial'],

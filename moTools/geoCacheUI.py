@@ -429,6 +429,8 @@ def btncmd_CAM(shotNum, *args):
 def btncmd_AST(filePath, *args):
 
 	if filePath:
+		system.createReference(filePath, namespace= '')
+		'''
 		try:
 			system.openFile(filePath)
 		except:
@@ -443,18 +445,19 @@ def btncmd_AST(filePath, *args):
 				)
 			if decision == 'Yes':
 				system.openFile(filePath, f= 1)
+		'''
 
 
 def btncmd_SHD(filePath, *args):
 
 	if filePath:
-		system.createReference(filePath, defaultNamespace= 1)
+		system.createReference(filePath, namespace= '')
 
 
 def btncmd_RIG(filePath, *args):
 
 	if filePath:
-		system.createReference(filePath, defaultNamespace= 1)
+		system.createReference(filePath, namespace= '')
 
 
 def btncmd_delShot(shotNum, *args):
@@ -881,12 +884,12 @@ def mkShotListBtn(windowName, shotColumn):
 		# ANI info extract
 		date_ANI = gcLog['shots'][shot]['ANI'].keys()
 		date_ANI.sort()
-		dateShortANI = shortDateFormat(date_ANI[-1]) if date_ANI[-1] else ''
-		filePath_ANI = gcLog['shots'][shot]['ANI'][date_ANI[-1]]
+		dateShortANI = shortDateFormat(date_ANI[-1]) if date_ANI and date_ANI[-1] else ''
+		filePath_ANI = gcLog['shots'][shot]['ANI'][date_ANI[-1]] if dateShortANI else ''
 		#author_ANI =
 		#station_ANI =
-		fileName_ANI = os.path.basename(filePath_ANI)
-		sceneName_ANI = os.path.splitext(fileName_ANI)[0]
+		fileName_ANI = os.path.basename(filePath_ANI) if dateShortANI else ''
+		sceneName_ANI = os.path.splitext(fileName_ANI)[0] if dateShortANI else ''
 
 		# CAM info extract
 		date_CAM = gcLog['shots'][shot]['CAM'].keys()

@@ -14,7 +14,8 @@ logger = logging.getLogger('MayaOil.moGeocache.Main')
 
 
 def _getRootNode(assetName_override= None):
-
+	"""
+	"""
 	rootNode_List = moMethod.mProcQueue()
 	if assetName_override and len(rootNode_List) > 1:
 		rootNode_List = [rootNode_List[-1]]
@@ -24,7 +25,8 @@ def _getRootNode(assetName_override= None):
 
 
 def getAssetList():
-
+	"""
+	"""
 	assetList = []
 	rootNode_List = _getRootNode()
 	for rootNode in rootNode_List:
@@ -37,7 +39,8 @@ def getAssetList():
 
 
 def getGeoCacheDir(assetName, mode, sceneName):
-
+	"""
+	"""
 	return moRules.rGeoCacheDir(assetName, mode, sceneName)
 
 
@@ -51,6 +54,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 	workingNS = moRules.rWorkingNS()
 	viskeyNS = moRules.rViskeyNS()
 	rigkeyNS = moRules.rRigkeyNS()
+	nodeOutNS = moRules.rNodeOutNS()
 	# get playback range
 	playbackRange_keep = moRules.rPlaybackRange()
 	isStatic = True if isStatic else False
@@ -106,6 +110,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 		geoFileType = moRules.rGeoFileType()
 		smoothExclusive, smoothMask = moMethod.mGetSmoothMask(assetName)
 		rigCtrlList = moMethod.mGetRigCtrlExportList(assetName)
+		outNodeDict = moMethod.mGetNodeOutputList(assetName)
 
 		logger.info('AssetName: [' + assetName + ']')
 
@@ -133,7 +138,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 			# export visKey
 			for visAniNode in visAniNodeList:
 				cmds.select(visAniNode, r= 1)
-				keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName, visAniNode)
+				keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName, anim_viskey[visAniNodeList.index(visAniNode)])
 				moMethod.mExportViskey(keyFile)
 			# remove mGCVisKey namespace
 			logger.info('viskeyNS: <' + viskeyNS + '> Del.')
@@ -143,6 +148,32 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 			cmds.undo()
 		else:
 			logger.warning('No visibility key.')
+
+		''' nodeOutput
+		'''
+		if outNodeDict and not isPartial:
+			# open undo chunk, for later undo from visKey bake 
+			cmds.undoInfo(ock= 1)
+			# Add and Set namespace
+			logger.info('nodeOutNS: <' + nodeOutNS + '> Set.')
+			moMethod.mSetupWorkingNS(nodeOutNS)
+			# bake outKey
+			moMethod.mBakeOutkey(outNodeDict, playbackRange, assetNS)
+			# collect all visibility animation node
+			outAniNodeDict = moMethod.mDuplicateOutkey(outNodeDict, assetNS)
+			# export outKey
+			for outAniNode in outAniNodeDict:
+				cmds.select(outAniNode, r= 1)
+				keyFile = moRules.rOutkeyFilePath(geoCacheDir, assetName, outAniNode)
+				moMethod.mExportOutkey(keyFile, outAniNode, outAniNodeDict[outAniNode])
+			# remove mGCVisKey namespace
+			logger.info('nodeOutNS: <' + nodeOutNS + '> Del.')
+			moMethod.mCleanWorkingNS(nodeOutNS)
+			# close undo chunk, and undo
+			cmds.undoInfo(cck= 1)
+			cmds.undo()
+		else:
+			logger.warning('No nodeOutput key.')
 
 		''' rigging ctrls
 		'''
@@ -215,7 +246,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 	logger.info('GeoCache export completed.')
 
  
-def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDuplicateName= None, conflictList= None):
+def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDuplicateName= None, conflictList= None, didWrap= None):
 	"""
 	輸入 geoCache
 	"""
@@ -224,6 +255,8 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 	# namespace during action
 	workingNS = moRules.rWorkingNS()
 	viskeyNS = moRules.rViskeyNS()
+	rigkeyNS = moRules.rRigkeyNS()
+	nodeOutNS = moRules.rNodeOutNS()
 
 	# get list of items to process
 	rootNode_List = _getRootNode(assetName_override)
@@ -294,6 +327,25 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 		else:
 			logger.warning('[' + rootNode + '] No geoList file to follow.')
 
+
+		# get outkey from ma file
+		outAniNodeList = moMethod.mLoadOutKeyList(geoCacheDir, '_input.json')
+		if not isPartial:
+			if outAniNodeList:
+				logger.info('nodeOutNS: <' + nodeOutNS + '> Del.')
+				# remove mGCVisKey namespace
+				moMethod.mCleanWorkingNS(':' + assetName + nodeOutNS)
+				logger.info('[' + rootNode + ']' + ' importing nodeOut key.')
+				for outAniNode in outAniNodeList:
+					keyFile = moRules.rOutkeyFilePath(geoCacheDir, assetName, outAniNode)
+					if cmds.file(keyFile, q= 1, ex= 1):
+						# import viskey and keep mGCVisKey namespace in viskey
+						moMethod.mImportOutkey(keyFile, assetNS, assetName, assetName + nodeOutNS + ':' + outAniNode)
+			else:
+				logger.warning('[' + rootNode + '] No nodeOut key file to import.')
+		else:
+			pass
+
 		# get viskey from ma file
 		visAniNodeList = moMethod.mLoadVisKeyList(geoCacheDir, '_visKeys.ma')
 		if visAniNodeList:
@@ -302,23 +354,69 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 			else:
 				logger.info('viskeyNS: <' + viskeyNS + '> Del.')
 				# remove mGCVisKey namespace
-				moMethod.mCleanWorkingNS(viskeyNS)
+				moMethod.mCleanWorkingNS(':' + assetName + viskeyNS)
+
+		if visAniNodeList:
+			logger.info('[' + rootNode + ']' + (' PARTIAL' if isPartial else '') + ' importing visibility key.')
 			for visAniNode in visAniNodeList:
 				keyFile = moRules.rViskeyFilePath(geoCacheDir, assetName, visAniNode)
 				if cmds.file(keyFile, q= 1, ex= 1):
 					# import viskey and keep mGCVisKey namespace in viskey
-					moMethod.mImportViskey(keyFile, assetNS, viskeyNS.split(':')[-1] + ':' + visAniNode)
+					moMethod.mImportViskey(keyFile, assetNS, assetName, assetName + viskeyNS + ':' + visAniNode)
 		else:
 			logger.warning('[' + rootNode + '] No visibility key file to import.')
 
 		# get rigging ctrls from ma file
 		rigFile = moRules.rRigkeyFilePath(geoCacheDir, assetName)
 		if cmds.file(rigFile, q= 1, ex= 1):
+			# remove mGCRigKey namespace
+			moMethod.mCleanWorkingNS(':' + assetName + rigkeyNS)
 			# import rigging ctrls
 			moMethod.mImportRigkey(rigFile)
 		else:
 			logger.warning('[' + rootNode + '] No rigging controls to import.')
 
 		logger.info('[' + rootNode + ']' + (' PARTIAL' if isPartial else '') + ' imported.')
+
+		# check wrap
+		didWrap = [] if didWrap is None else didWrap
+		wrapDict = moMethod.mGetWrappingList(assetName)
+		if not isPartial and wrapDict:
+			logger.info('[' + rootNode + ']' + ' has wrap set.')
+			wBatchDict = {}
+			willWrap = []
+			# collect all wrapSet in this batch
+			current = cmds.currentTime(q= 1)
+			# 為了正確的執行 wrap, 將影格切到最有可能是 T Pose 的第 0 格
+			cmds.currentTime(0)
+			for wSet in wrapDict:
+				if wSet not in didWrap:
+					# convert name
+					wSource = wrapDict[wSet]['source']
+					wTarget = wrapDict[wSet]['target']
+					wSource, wTarget = moMethod.mFindWrapObjsName(wSource, wTarget, assetNS, conflictList)
+					if wSource and wTarget:
+						# check if wrap source has cached or wrapped in last iter
+						if moMethod.mWrapSourceHasCached(wSource):
+							wBatchDict[wSource] = wTarget
+							willWrap.append(wSet)
+							logger.info('[' + rootNode + '] WrapSet <' + wSet + '> Source has cache, do wrap.')
+							# 如果 wrap 的 source 物件或其父群組物件的狀態為隱藏，就會在 export 過程中被忽略
+							# 最好將需要 wrap 的物件分類到明顯的群組管理其顯示狀態
+							moMethod.mDoWrap(wSource, wTarget)
+					else:
+						logger.warning('[' + rootNode + '] WrapSet <' + wSet + '> Name refind failed.')
+			cmds.currentTime(current)
+			if wBatchDict:
+				wTargetBat = [t for wt in wBatchDict.values() for t in wt]
+				logger.info('[' + rootNode + ']' + ' Starting cache wrapped object.')
+				cmds.select(wTargetBat, r= 1)
+				exportGeoCache(isPartial= True, assetName_override= assetName_override)
+				logger.info('[' + rootNode + ']' + ' Removing cached source.')
+				moMethod.mRemoveWrap(wBatchDict.keys(), wTargetBat)
+				logger.info('[' + rootNode + ']' + ' Starting import cached wrap source.')
+				sName = moRules.rCurrentSceneName()
+				cmds.select(wTargetBat, r= 1)
+				importGeoCache(sName, True, assetName_override, ignorDuplicateName, conflictList, willWrap)
 
 	logger.info('GeoCache' + (' PARTIAL' if isPartial else '') + ' import completed.')
