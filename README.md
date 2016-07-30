@@ -1,5 +1,5 @@
-# MS_MayaOil
-Autodesk Maya Pipeline Tools for MoonShine@TW
+# MS_Research
+Autodesk Maya Pipeline Tools Research for MoonShine@TW
 
 ## Main Idea
 
