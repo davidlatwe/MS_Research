@@ -15,17 +15,21 @@ logger = logging.getLogger('MayaOil.moGeocache.Main')
 
 def _getRootNode(assetName_override= None):
 	"""
+	找出選取內容的根物件，如果 assetName_override 為 True ，
+	則只回傳根物件 List 裡的最後一個根物件
 	"""
 	rootNode_List = moMethod.mProcQueue()
 	if assetName_override and len(rootNode_List) > 1:
 		rootNode_List = [rootNode_List[-1]]
-		logger.warning('AssetName has override, only the last rootNode will be processed.')
+		logger.warning('AssetName has override, only the last rootNode will be pass.')
 
 	return rootNode_List
 
 
 def getAssetList():
 	"""
+	從根物件的 transformNode 名稱取出 assetName
+	** 目前尚無法處理含有重複 asset 的狀況
 	"""
 	assetList = []
 	rootNode_List = _getRootNode()
@@ -40,6 +44,7 @@ def getAssetList():
 
 def getGeoCacheDir(assetName, mode, sceneName):
 	"""
+	取得該 asset 的 GeoCache 存放路徑，並依 mode 來判斷是否需要在路徑不存在時建立資料夾
 	"""
 	return moRules.rGeoCacheDir(assetName, mode, sceneName)
 
@@ -47,6 +52,11 @@ def getGeoCacheDir(assetName, mode, sceneName):
 def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName_override= None, sceneName_override= None):
 	"""
 	輸出 geoCache
+	@param  subdivLevel - 模型在 cache 之前需要被 subdivide smooth 的次數
+	@param    isPartial - 局部輸出模式 (只輸出所選，不輸出 asset 根物件底下的所有子物件)
+	@param     isStatic - 靜態物件輸出
+	@param  assetName_override - 輸出過程用此取代該 物件 原本的 assetName
+	@param  sceneName_override - 輸出過程用此取代該 場景 原本的 sceneName
 	"""
 	logger.info('GeoCache export init.')
 
@@ -58,6 +68,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 	# get playback range
 	playbackRange_keep = moRules.rPlaybackRange()
 	isStatic = True if isStatic else False
+	# 若為靜態輸出模式，變更 playbackRange 為兩個 frame 的長度
 	if isStatic:
 		timelineInfo = moMethod.mSetStaticRange()
 	else:
@@ -72,7 +83,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 
 	# partial mode
 	if isPartial:
-		# get partial
+		# 取得局部選取範圍的物件清單並建立成字典
 		partial_Dict = moMethod.mPartialQueue(partial_Dict)
 
 		'''partial check
@@ -85,6 +96,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 				logger.debug(dag)
 		logger.debug('**********************************')
 
+	# 正式開始前，先檢查並清除待會作業要使用的 Namespace
 	# remove mGC namespace
 	moMethod.mCleanWorkingNS(workingNS)
 	# remove mGCVisKey namespace
@@ -95,6 +107,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 	logger.info('GeoCache' + (' PARTIAL' if isPartial else '') + ' export start.')
 	logger.info('export queue: ' + str(len(rootNode_List)))
 
+	# 作業開始，依序處理各個 asset
 	for rootNode in rootNode_List:
 		if isPartial and not partial_Dict[rootNode]:
 			logger.info('No partial selection under [' + rootNode + '] .')
@@ -114,12 +127,14 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 
 		logger.info('AssetName: [' + assetName + ']')
 
+		# 物件過濾
 		# FILTER OUT <intermediate objects> & <constant hidden objects>
 		filterResult = moMethod.mFilterOut(rootNode)
 		anim_meshes = filterResult[0]
 		anim_viskey = filterResult[1]
 
 		if isPartial:
+			# 檢查過濾出來的物件是否在局部選取範圍中，並更新過濾清單
 			anim_viskey = [dag for dag in anim_viskey if dag.split('|')[-1].split(':')[-1] in partial_Dict[rootNode]]
 			anim_meshes = [dag for dag in anim_meshes if dag.split('|')[-1].split(':')[-1] in partial_Dict[rootNode]]
 		
@@ -133,7 +148,7 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 			moMethod.mSetupWorkingNS(viskeyNS)
 			# bake visKey
 			moMethod.mBakeViskey(anim_viskey, playbackRange)
-			# collect all visibility animation node
+			# duplicate and collect all baked visibility animation node
 			visAniNodeList = moMethod.mDuplicateViskey(anim_viskey)
 			# export visKey
 			for visAniNode in visAniNodeList:
@@ -249,6 +264,12 @@ def exportGeoCache(subdivLevel= None, isPartial= None, isStatic= None, assetName
 def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDuplicateName= None, conflictList= None, didWrap= None):
 	"""
 	輸入 geoCache
+	@param    sceneName - geoCache 來源的場景名稱
+	@param    isPartial - 局部輸入模式 (只輸入所選，不輸入 asset 根物件底下的所有子物件)
+	@param  assetName_override - 輸出過程用此取代該 物件 原本的 assetName
+	@param  ignorDuplicateName - 忽略相同物件名稱的衝突，輸入相同的 geoCache
+	@param        conflictList - 物件路徑與名稱只要包含此陣列參數內的字串就跳過輸入
+	@param             didWrap - 此為輸入程序內部進行 wrap 遞迴時所用，紀錄已經處理過的 wrap 物件，以避免無限遞迴
 	"""
 	logger.info('GeoCache import init.')
 
@@ -264,7 +285,7 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 
 	# partial mode
 	if isPartial:
-		# get partial
+		# 取得局部選取範圍的物件清單並建立成字典
 		partial_Dict = moMethod.mPartialQueue(partial_Dict)
 
 		'''partial check
@@ -280,6 +301,7 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 	logger.info('GeoCache' + (' PARTIAL' if isPartial else '') + ' import start.')
 	logger.info('import queue: ' + str(len(rootNode_List)))
 
+	# 作業開始，依序處理各個 asset
 	for rootNode in rootNode_List:
 		if isPartial and not partial_Dict[rootNode]:
 			logger.debug('No partial selection under [' + rootNode + '] .')
@@ -407,6 +429,7 @@ def importGeoCache(sceneName, isPartial= None, assetName_override= None, ignorDu
 					else:
 						logger.warning('[' + rootNode + '] WrapSet <' + wSet + '> Name refind failed.')
 			cmds.currentTime(current)
+			# 執行 Wrap 之後，進行自體 geoCache 輸出與輸入，將 wrap 變形器 cache 起來並刪除 wrap 變形器
 			if wBatchDict:
 				wTargetBat = [t for wt in wBatchDict.values() for t in wt]
 				logger.info('[' + rootNode + ']' + ' Starting cache wrapped object.')

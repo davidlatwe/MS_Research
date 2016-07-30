@@ -8,13 +8,13 @@ import re
 import logging
 logger = logging.getLogger('MayaOil.moGeocache.Rules')
 
-import moSceneInfo; reload(moSceneInfo)
+import mMaya.mSceneInfo as mSceneInfo; reload(mSceneInfo)
 
 
 def _getSceneInfo():
 	"""
 	"""
-	return moSceneInfo.SceneInfo()
+	return mSceneInfo.SceneInfo()
 
 
 def rCurrentSceneName():

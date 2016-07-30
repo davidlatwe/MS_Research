@@ -51,7 +51,7 @@ def mRangePushBack(restore= None):
 
 def mProcQueue():
 	"""
-	傳回物件清單，可建立不同入列規則來產生不同範圍的物件清單
+	找出所選取的物件的根物件，並做名稱排序後回傳
 	"""
 	expList = []
 
